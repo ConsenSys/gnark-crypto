@@ -19,8 +19,11 @@ package bw6756
 import (
 	"fmt"
 	"math/big"
+	"math/bits"
+	"runtime"
 	"testing"
 
+	"github.com/consensys/gnark-crypto/ecc"
 	"github.com/consensys/gnark-crypto/ecc/bw6-756/fp"
 	"github.com/consensys/gnark-crypto/ecc/bw6-756/fr"
 	"github.com/leanovate/gopter"
@@ -373,6 +376,146 @@ func TestMillerLoop(t *testing.T) {
 	properties.TestingRun(t, gopter.ConsoleReporter(false))
 }
 
+func TestMultiExpGT(t *testing.T) {
+
+	parameters := gopter.DefaultTestParameters()
+	parameters.MinSuccessfulTests = 2
+
+	properties := gopter.NewProperties(parameters)
+
+	genScalar := GenFr()
+
+	// size of the multiExps
+	const nbSamples = 143
+
+	// multi exp points
+	var samplePoints [nbSamples]GT
+	var _g, g GT
+	_g.SetRandom()
+
+	// put into GT
+	_g = FinalExponentiation(&_g)
+
+	g.Set(&_g)
+	for i := 1; i <= nbSamples; i++ {
+		samplePoints[i-1].Set(&g)
+		g.Mul(&g, &_g)
+	}
+
+	// final scalar to use in double and add method (without mixer factor)
+	// n(n+1)(2n+1)/6  (sum of the squares from 1 to n)
+	var scalar big.Int
+	scalar.SetInt64(nbSamples)
+	scalar.Mul(&scalar, new(big.Int).SetInt64(nbSamples+1))
+	scalar.Mul(&scalar, new(big.Int).SetInt64(2*nbSamples+1))
+	scalar.Div(&scalar, new(big.Int).SetInt64(6))
+
+	// ensure a multiexp that's splitted has the same result as a non-splitted one..
+	properties.Property("[GT] Multi exponentation (c=16) should be consistant with splitted multiexp", prop.ForAll(
+		func(mixer fr.Element) bool {
+			var samplePointsLarge [nbSamples * 13]GT
+			for i := 0; i < 13; i++ {
+				copy(samplePointsLarge[i*nbSamples:], samplePoints[:])
+			}
+
+			var r16, splitted1, splitted2 GT
+
+			// mixer ensures that all the words of a fpElement are set
+			var sampleScalars [nbSamples * 13]fr.Element
+
+			for i := 1; i <= nbSamples; i++ {
+				sampleScalars[i-1].SetUint64(uint64(i)).
+					Mul(&sampleScalars[i-1], &mixer).
+					FromMont()
+			}
+
+			scalars16, _ := partitionScalars(sampleScalars[:], 16, false, runtime.NumCPU())
+			r16.MsmC16(samplePoints[:], scalars16, true)
+
+			splitted1.MultiExp(samplePointsLarge[:], sampleScalars[:], ecc.MultiExpConfig{NbTasks: 128})
+			splitted2.MultiExp(samplePointsLarge[:], sampleScalars[:], ecc.MultiExpConfig{NbTasks: 51})
+			return r16.Equal(&splitted1) && r16.Equal(&splitted2)
+		},
+		genScalar,
+	))
+
+	// we test only c = 5 and c = 16
+	properties.Property("[GT] Multi exponentation (c=5, c=16) should be consistant with sum of square", prop.ForAll(
+		func(mixer fr.Element) bool {
+
+			var expected, g GT
+			g.SetRandom()
+			// put into GT
+			g = FinalExponentiation(&_g)
+
+			// compute expected result with double and add
+			var finalScalar, mixerBigInt big.Int
+			finalScalar.Mul(&scalar, mixer.ToBigIntRegular(&mixerBigInt))
+			expected.ExpGLV(_g, &finalScalar)
+
+			// mixer ensures that all the words of a fpElement are set
+			var sampleScalars [nbSamples]fr.Element
+
+			for i := 1; i <= nbSamples; i++ {
+				sampleScalars[i-1].SetUint64(uint64(i)).
+					Mul(&sampleScalars[i-1], &mixer).
+					FromMont()
+			}
+
+			scalars5, _ := partitionScalars(sampleScalars[:], 5, false, runtime.NumCPU())
+			scalars16, _ := partitionScalars(sampleScalars[:], 16, false, runtime.NumCPU())
+
+			var r5, r16 GT
+			r5.MsmC5(samplePoints[:], scalars5, false)
+			r16.MsmC16(samplePoints[:], scalars16, true)
+			return (r5.Equal(&expected) && r16.Equal(&expected))
+		},
+		genScalar,
+	))
+
+	// note : this test is here as we expect to have a different multiExp than the above bucket method
+	// for small number of points
+	properties.Property("[GT] Multi exponentation (<50points) should be consistant with sum of square", prop.ForAll(
+		func(mixer fr.Element) bool {
+
+			var _g, g GT
+			_g.SetRandom()
+
+			// put into GT
+			_g = FinalExponentiation(&_g)
+
+			g.Set(&_g)
+
+			// mixer ensures that all the words of a fpElement are set
+			samplePoints := make([]GT, 30)
+			sampleScalars := make([]fr.Element, 30)
+
+			for i := 1; i <= 30; i++ {
+				sampleScalars[i-1].SetUint64(uint64(i)).
+					Mul(&sampleScalars[i-1], &mixer).
+					FromMont()
+				samplePoints[i-1].Set(&g)
+				g.Mul(&g, &_g)
+			}
+
+			var op1MultiExp GT
+			op1MultiExp.MultiExp(samplePoints, sampleScalars, ecc.MultiExpConfig{})
+
+			var finalBigScalar fr.Element
+			var finalBigScalarBi big.Int
+			var op1ScalarMul GT
+			finalBigScalar.SetString("9455").Mul(&finalBigScalar, &mixer)
+			finalBigScalar.ToBigIntRegular(&finalBigScalarBi)
+			op1ScalarMul.ExpGLV(_g, &finalBigScalarBi)
+
+			return op1ScalarMul.Equal(&op1MultiExp)
+		},
+		genScalar,
+	))
+
+	properties.TestingRun(t, gopter.ConsoleReporter(false))
+}
+
 // ------------------------------------------------------------
 // benches
 
@@ -477,7 +620,8 @@ func BenchmarkExpGT(b *testing.B) {
 	var e fp.Element
 	e.SetRandom()
 
-	k := new(big.Int).SetUint64(12)
+	k := new(big.Int).SetUint64(6)
+
 	e.Exp(e, k)
 	var _e big.Int
 	e.BigInt(&_e)
@@ -502,4 +646,38 @@ func BenchmarkExpGT(b *testing.B) {
 			a.ExpGLV(a, &_e)
 		}
 	})
+}
+
+func BenchmarkMultiExpGT(b *testing.B) {
+	// ensure every words of the scalars are filled
+	var mixer fr.Element
+	mixer.SetString("7716837800905789770901243404444209691916730933998574719964609384059111546487")
+
+	const pow = (bits.UintSize / 2) - (bits.UintSize / 8) // 24 on 64 bits arch, 12 on 32 bits
+	const nbSamples = 1 << pow
+
+	var samplePoints [nbSamples]GT
+	var sampleScalars [nbSamples]fr.Element
+	var _g GT
+	_g.SetRandom()
+
+	for i := 1; i <= nbSamples; i++ {
+		sampleScalars[i-1].SetUint64(uint64(i)).
+			Mul(&sampleScalars[i-1], &mixer).
+			FromMont()
+		samplePoints[i-1].Set(&_g)
+	}
+
+	var testPoint GT
+
+	for i := 5; i <= pow; i++ {
+		using := 1 << i
+
+		b.Run(fmt.Sprintf("%d points", using), func(b *testing.B) {
+			b.ResetTimer()
+			for j := 0; j < b.N; j++ {
+				testPoint.MultiExp(samplePoints[:using], sampleScalars[:using], ecc.MultiExpConfig{})
+			}
+		})
+	}
 }
