@@ -64,7 +64,7 @@ func ReaderRoot(r io.Reader, h hash.Hash, segmentSize int) (root []byte, err err
 
 // BuildReaderProof returns a proof that certain data is in the merkle tree
 // created by the data in the reader. The merkle root, set of proofs, and the
-// number of leaves in the Merkle tree are all returned. All leaves will we
+// number of leaves in the Merkle tree are all returned. All leaves will be
 // 'segmentSize' bytes except the last leaf, which will not be padded out if
 // there are not enough bytes remaining in the reader.
 func BuildReaderProof(r io.Reader, h hash.Hash, segmentSize int, index uint64) (root []byte, proofSet [][]byte, numLeaves uint64, err error) {

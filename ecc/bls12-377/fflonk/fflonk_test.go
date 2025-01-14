@@ -72,7 +72,7 @@ func TestFflonk(t *testing.T) {
 	err = BatchVerify(proof, digests, x, hf, testSrs.Vk)
 	assert.NoError(err)
 
-	// tamper the proof
+	// tamper with the proof
 	proof.ClaimedValues[0][0][0].SetRandom()
 	err = BatchVerify(proof, digests, x, hf, testSrs.Vk)
 	assert.Error(err)
