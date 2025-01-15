@@ -5,9 +5,13 @@ import (
 
 	"github.com/consensys/bavard"
 	"github.com/consensys/gnark-crypto/internal/generator/config"
+	"github.com/consensys/gnark-crypto/internal/generator/git"
 )
 
 func Generate(conf config.FieldDependency, baseDir string, bgen *bavard.BatchGenerator) error {
+	if !git.HasChanges("./hash_to_field/template/") {
+		return nil
+	}
 	entries := []bavard.Entry{
 		{File: filepath.Join(baseDir, "doc.go"), Templates: []string{"doc.go.tmpl"}},
 		{File: filepath.Join(baseDir, "hash_to_field.go"), Templates: []string{"hash_to_field.go.tmpl"}},

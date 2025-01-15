@@ -5,9 +5,13 @@ import (
 
 	"github.com/consensys/bavard"
 	"github.com/consensys/gnark-crypto/internal/generator/config"
+	"github.com/consensys/gnark-crypto/internal/generator/git"
 )
 
 func Generate(conf config.TwistedEdwardsCurve, baseDir string, bgen *bavard.BatchGenerator) error {
+	if !(git.HasChanges("./edwards/eddsa/template")) {
+		return nil
+	}
 	// eddsa
 	conf.Package = "eddsa"
 	baseDir = filepath.Join(baseDir, conf.Package)

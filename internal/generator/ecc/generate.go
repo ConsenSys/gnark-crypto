@@ -11,10 +11,15 @@ import (
 
 	"github.com/consensys/bavard"
 	"github.com/consensys/gnark-crypto/internal/generator/config"
+	"github.com/consensys/gnark-crypto/internal/generator/git"
 )
 
 func Generate(conf config.Curve, baseDir string, bgen *bavard.BatchGenerator) error {
-
+	if !git.HasChanges("./ecc/template") {
+		// note; we could wrap the bavard gen function here, and filter out the entries
+		// that have changes to be more granular in the skip.
+		return nil
+	}
 	packageName := strings.ReplaceAll(conf.Name, "-", "")
 
 	var entries []bavard.Entry

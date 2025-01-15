@@ -5,10 +5,13 @@ import (
 
 	"github.com/consensys/bavard"
 	"github.com/consensys/gnark-crypto/internal/generator/config"
+	"github.com/consensys/gnark-crypto/internal/generator/git"
 )
 
 func Generate(conf config.Curve, baseDir string, bgen *bavard.BatchGenerator) error {
-
+	if !(git.HasChanges("./kzg/template")) {
+		return nil
+	}
 	// kzg commitment scheme
 	conf.Package = "kzg"
 	entries := []bavard.Entry{

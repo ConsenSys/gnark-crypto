@@ -19,6 +19,7 @@ import (
 	"github.com/consensys/gnark-crypto/internal/generator/edwards/eddsa"
 	"github.com/consensys/gnark-crypto/internal/generator/fflonk"
 	fri "github.com/consensys/gnark-crypto/internal/generator/fri/template"
+	"github.com/consensys/gnark-crypto/internal/generator/git"
 	"github.com/consensys/gnark-crypto/internal/generator/gkr"
 	"github.com/consensys/gnark-crypto/internal/generator/hash_to_field"
 	"github.com/consensys/gnark-crypto/internal/generator/iop"
@@ -81,8 +82,10 @@ func main() {
 			if conf.Equal(config.BLS12_377) {
 				frOpts = append(frOpts, generator.WithSIS())
 			}
-			assertNoError(generator.GenerateFF(conf.Fr, filepath.Join(curveDir, "fr"), frOpts...))
-			assertNoError(generator.GenerateFF(conf.Fp, filepath.Join(curveDir, "fp"), generator.WithASM(asmConfig)))
+			if git.HasChanges("field") {
+				assertNoError(generator.GenerateFF(conf.Fr, filepath.Join(curveDir, "fr"), frOpts...))
+				assertNoError(generator.GenerateFF(conf.Fp, filepath.Join(curveDir, "fp"), generator.WithASM(asmConfig)))
+			}
 
 			// generate ecdsa
 			assertNoError(ecdsa.Generate(conf, curveDir, bgen))

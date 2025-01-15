@@ -1,12 +1,14 @@
 package test_vector_utils
 
 import (
+	"path/filepath"
+
 	"github.com/consensys/bavard"
 	"github.com/consensys/gnark-crypto/internal/generator/config"
+	"github.com/consensys/gnark-crypto/internal/generator/git"
 	"github.com/consensys/gnark-crypto/internal/generator/gkr"
 	"github.com/consensys/gnark-crypto/internal/generator/polynomial"
 	"github.com/consensys/gnark-crypto/internal/generator/sumcheck"
-	"path/filepath"
 )
 
 type Config struct {
@@ -49,6 +51,9 @@ func GenerateRationals(bgen *bavard.BatchGenerator) error {
 }
 
 func Generate(conf Config, baseDir string, bgen *bavard.BatchGenerator) error {
+	if !git.HasChanges("./test_vector_utils/template/") {
+		return nil
+	}
 	entry := bavard.Entry{
 		File: filepath.Join(baseDir, "test_vector_utils.go"), Templates: []string{"test_vector_utils.go.tmpl"},
 	}

@@ -1,9 +1,11 @@
 package gkr
 
 import (
+	"path/filepath"
+
 	"github.com/consensys/bavard"
 	"github.com/consensys/gnark-crypto/internal/generator/config"
-	"path/filepath"
+	"github.com/consensys/gnark-crypto/internal/generator/git"
 )
 
 type Config struct {
@@ -15,6 +17,9 @@ type Config struct {
 }
 
 func Generate(config Config, baseDir string, bgen *bavard.BatchGenerator) error {
+	if !git.HasChanges("./gkr/template/") {
+		return nil
+	}
 	entries := []bavard.Entry{
 		{File: filepath.Join(baseDir, "gkr.go"), Templates: []string{"gkr.go.tmpl"}},
 	}
