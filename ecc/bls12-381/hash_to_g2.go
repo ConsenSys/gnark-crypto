@@ -183,6 +183,17 @@ func g2SqrtRatio(z *fptower.E2, u *fptower.E2, v *fptower.E2) uint64 {
 	return isQNr
 }
 
+func G2SqrtRatio(z0, z1, u0, u1, v0, v1 *fp.Element) uint64 {
+	var z fptower.E2
+	u := fptower.E2{A0: *u0, A1: *u1}
+	v := fptower.E2{A0: *v0, A1: *v1}
+	ret := g2SqrtRatio(&z, &u, &v)
+	*z0 = z.A0
+	*z1 = z.A1
+
+	return ret
+}
+
 func g2NotOne(x *fptower.E2) uint64 {
 
 	//Assuming hash is implemented for G1 and that the curve is over Fp
