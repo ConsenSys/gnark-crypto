@@ -43,6 +43,10 @@ func GenerateRationals(bgen *bavard.BatchGenerator) error {
 	}
 
 	// generate gkr test vector generator for rationals
+	if !git.HasChanges("./gkr/template/") {
+		return nil
+	}
+
 	gkrConf.OutsideGkrPackage = true
 	return bgen.Generate(gkrConf, "main", "./gkr/template", bavard.Entry{
 		File: filepath.Join("gkr", "test_vectors", "main.go"), Templates: []string{"gkr.test.vectors.gen.go.tmpl", "gkr.test.vectors.go.tmpl"},
