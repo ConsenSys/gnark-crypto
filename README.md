@@ -1,6 +1,6 @@
 # gnark-crypto
 
-[![Twitter URL](https://img.shields.io/twitter/url/https/twitter.com/gnark_team.svg?style=social&label=Follow%20%40gnark_team)](https://twitter.com/gnark_team) [![License](https://img.shields.io/badge/license-Apache%202-blue)](LICENSE)  [![Go Report Card](https://goreportcard.com/badge/github.com/Consensys/gnark-crypto)](https://goreportcard.com/badge/github.com/Consensys/gnark-crypto) [![PkgGoDev](https://pkg.go.dev/badge/mod/github.com/Consensys/gnark-crypto)](https://pkg.go.dev/mod/github.com/Consensys/gnark-crypto) [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.5815453.svg)](https://doi.org/10.5281/zenodo.5815453)
+[![Twitter URL](https://img.shields.io/twitter/url/https/twitter.com/gnark_team.svg?style=social&label=Follow%20%40gnark_team)](https://twitter.com/gnark_team) [![License](https://img.shields.io/badge/license-Apache%202-blue)](LICENSE)  [![Go Report Card](https://goreportcard.com/badge/github.com/Consensys/gnark-crypto)](https://goreportcard.com/badge/github.com/Consensys/gnark-crypto) [![PkgGoDev](https://pkg.go.dev/badge/mod/github.com/Consensys/gnark-crypto)](https://pkg.go.dev/mod/github.com/consensys/gnark-crypto) [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.5815453.svg)](https://doi.org/10.5281/zenodo.5815453)
 
 `gnark-crypto` provides efficient cryptographic primitives, in Go:
 
@@ -103,20 +103,20 @@ We use [SemVer](http://semver.org/) for versioning. For the versions available, 
 
 This project is licensed under the Apache 2 License - see the [LICENSE](LICENSE) file for details.
 
-[`field/goff`]: https://pkg.go.dev/github.com/Consensys/gnark-crypto/field/goff
-[`bn254`]: https://pkg.go.dev/github.com/Consensys/gnark-crypto/ecc/bn254
-[`bls12-381`]: https://pkg.go.dev/github.com/Consensys/gnark-crypto/ecc/bls12-381
-[`bls24-317`]: https://pkg.go.dev/github.com/Consensys/gnark-crypto/ecc/bls24-317
-[`bls12-377`]: https://pkg.go.dev/github.com/Consensys/gnark-crypto/ecc/bls12-377
-[`bls24-315`]: https://pkg.go.dev/github.com/Consensys/gnark-crypto/ecc/bls24-315
-[`bw6-761`]: https://pkg.go.dev/github.com/Consensys/gnark-crypto/ecc/bw6-761
-[`bw6-633`]: https://pkg.go.dev/github.com/Consensys/gnark-crypto/ecc/bw6-633
-[`twistededwards`]: https://pkg.go.dev/github.com/Consensys/gnark-crypto/ecc/bn254/twistededwards
-[`eddsa`]: https://pkg.go.dev/github.com/Consensys/gnark-crypto/ecc/bn254/twistededwards/eddsa
-[`fft`]: https://pkg.go.dev/github.com/Consensys/gnark-crypto/ecc/bn254/fr/fft
-[`fri`]: https://pkg.go.dev/github.com/Consensys/gnark-crypto/ecc/bn254/fr/fri
-[`mimc`]: https://pkg.go.dev/github.com/Consensys/gnark-crypto/ecc/bn254/fr/mimc
-[`kzg`]: https://pkg.go.dev/github.com/Consensys/gnark-crypto/ecc/bn254/fr/kzg
-[`plookup`]: https://pkg.go.dev/github.com/Consensys/gnark-crypto/ecc/bn254/fr/plookup
-[`permutation`]: https://pkg.go.dev/github.com/Consensys/gnark-crypto/ecc/bn254/fr/permutation
-[`fiatshamir`]: https://pkg.go.dev/github.com/Consensys/gnark-crypto/fiat-shamir
+[`field/goff`]: https://pkg.go.dev/github.com/consensys/gnark-crypto/field/goff
+[`bn254`]: https://pkg.go.dev/github.com/consensys/gnark-crypto/ecc/bn254
+[`bls12-381`]: https://pkg.go.dev/github.com/consensys/gnark-crypto/ecc/bls12-381
+[`bls24-317`]: https://pkg.go.dev/github.com/consensys/gnark-crypto/ecc/bls24-317
+[`bls12-377`]: https://pkg.go.dev/github.com/consensys/gnark-crypto/ecc/bls12-377
+[`bls24-315`]: https://pkg.go.dev/github.com/consensys/gnark-crypto/ecc/bls24-315
+[`bw6-761`]: https://pkg.go.dev/github.com/consensys/gnark-crypto/ecc/bw6-761
+[`bw6-633`]: https://pkg.go.dev/github.com/consensys/gnark-crypto/ecc/bw6-633
+[`twistededwards`]: https://pkg.go.dev/github.com/consensys/gnark-crypto/ecc/bn254/twistededwards
+[`eddsa`]: https://pkg.go.dev/github.com/consensys/gnark-crypto/ecc/bn254/twistededwards/eddsa
+[`fft`]: https://pkg.go.dev/github.com/consensys/gnark-crypto/ecc/bn254/fr/fft
+[`fri`]: https://pkg.go.dev/github.com/consensys/gnark-crypto/ecc/bn254/fr/fri
+[`mimc`]: https://pkg.go.dev/github.com/consensys/gnark-crypto/ecc/bn254/fr/mimc
+[`kzg`]: https://pkg.go.dev/github.com/consensys/gnark-crypto/ecc/bn254/fr/kzg
+[`plookup`]: https://pkg.go.dev/github.com/consensys/gnark-crypto/ecc/bn254/fr/plookup
+[`permutation`]: https://pkg.go.dev/github.com/consensys/gnark-crypto/ecc/bn254/fr/permutation
+[`fiatshamir`]: https://pkg.go.dev/github.com/consensys/gnark-crypto/fiat-shamir
