@@ -4,10 +4,10 @@
 import json
 import random
 
-# bls12377 FR
-# 8444461749428370424248824938781546531375899335154063827935233455917409239041
-R = 8444461749428370424248824938781546531375899335154063827935233455917409239041
-FR_BYTE_SIZE = 32
+# koalabear FR
+# 2^31 - 2^24 + 1
+R = 2**31-2**24+1
+FR_BYTE_SIZE = 4
 FR_BIT_SIZE = FR_BYTE_SIZE*8
 GFR = GF(R)
 FR.<x> = GFR[]
@@ -217,13 +217,12 @@ def SISParams(seed, logTwoDegree, logTwoBound, maxNbElementsToHash):
 PARAMS = [
 ]
 
-bounds = [8,16,32,64]
-degrees = [5,6,7,8,9,10,11]
+bounds = [8, 16]
+degrees = [5,6,7,8,9]
 
 for bound in bounds:
     for degree in degrees:
         PARAMS.append(SISParams(5, degree, bound, 10))
-
 
 def random_inputs(size, modulus):
     return [GFR(random.randint(0, modulus - 1)) for _ in range(size)]
