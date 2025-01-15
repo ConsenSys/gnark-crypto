@@ -130,7 +130,7 @@ func (f *FFAmd64) AssertCleanStack(reservedStackSize, minStackSize int) {
 	if usedStackSize > reservedStackSize {
 		panic("using more stack size than reserved")
 	} else if max(usedStackSize, minStackSize) < reservedStackSize {
-		// this panic is for dev purposes as this may be by design for aligment
+		// this panic is for dev purposes as this may be by design for alignment
 		panic("reserved more stack size than needed")
 	}
 

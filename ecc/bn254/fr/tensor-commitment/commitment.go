@@ -171,7 +171,7 @@ func (tc *TensorCommitment) Append(ps ...[]fr.Element) ([][]byte, error) {
 	numRows := tc.params.NbRows
 
 	/*
-		Precomputes the number of columns that will be taken by each colums
+		Precomputes the number of columns that will be taken by each columns
 	*/
 	for iPol, p := range ps {
 		// check if there is some room for p

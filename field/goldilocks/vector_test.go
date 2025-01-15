@@ -223,7 +223,7 @@ func TestVectorOps(t *testing.T) {
 		}
 	}
 
-	properties.TestingRun(t, gopter.NewFormatedReporter(false, 260, os.Stdout))
+	properties.TestingRun(t, gopter.NewFormattedReporter(false, 260, os.Stdout))
 }
 
 func BenchmarkVectorOps(b *testing.B) {

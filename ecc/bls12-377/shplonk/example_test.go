@@ -50,7 +50,7 @@ func Example_batchOpen() {
 	// hash function that is used for the challenge derivation in Fiat Shamir
 	hf := sha256.New()
 
-	// ceate an opening proof of polynomials[i] on the set points[i]
+	// create an opening proof of polynomials[i] on the set points[i]
 	openingProof, err := BatchOpen(polynomials, digests, points, hf, testSrs.Pk)
 	if err != nil {
 		panic(err)
