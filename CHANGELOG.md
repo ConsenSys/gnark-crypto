@@ -1225,7 +1225,7 @@
 - dusted off polynomial.go (bls377, no code gen yet)
 
 ### Perf
-- remove unecessary inverse in KZG-verify
+- remove unnecessary inverse in KZG-verify
 - faster GLV scalar decompostion
 
 ### Refactor
@@ -1581,7 +1581,7 @@
 - Full paper implemented, unknown bug
 - Full paper implemented, tests passing
 - **bls24:** experiment with Fp-Fp2-Fp4-Fp12-Fp24 tower
-- **kzg:** test tampered proofs whith quotient set to zero
+- **kzg:** test tampered proofs with quotient set to zero
 - **plookup:** challenges are derived using Fiat Shamir
 - **plookup:** addition of prover and verifier for tables
 - **plookup:** proof generation
