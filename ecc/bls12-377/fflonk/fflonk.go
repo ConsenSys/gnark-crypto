@@ -19,7 +19,7 @@ import (
 var (
 	ErrRootsOne                       = errors.New("fr does not contain all the t-th roots of 1")
 	ErrNbPolynomialsNbPoints          = errors.New("the number of packs of polynomials should be the same as the number of pack of points")
-	ErrInonsistentFolding             = errors.New("the outer claimed values are not consistent with the shplonk proof")
+	ErrInconsistentFolding            = errors.New("the outer claimed values are not consistent with the shplonk proof")
 	ErrInconsistentNumberFoldedPoints = errors.New("the number of outer claimed values is inconsistent with the number of claimed values in the shplonk proof")
 )
 
@@ -185,7 +185,7 @@ func BatchVerify(proof OpeningProof, digests []kzg.Digest, points [][]fr.Element
 			for l := 0; l < t; l++ {
 				curFoldedClaimedValue = eval(polyClaimedValues, omgeaiPoint)
 				if !curFoldedClaimedValue.Equal(&proof.SOpeningProof.ClaimedValues[i][j*t+l]) {
-					return ErrInonsistentFolding
+					return ErrInconsistentFolding
 				}
 				omgeaiPoint.Mul(&omgeaiPoint, &omega)
 			}
