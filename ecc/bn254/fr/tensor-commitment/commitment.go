@@ -110,7 +110,7 @@ type TensorCommitment struct {
 	NbAppendsSoFar int
 }
 
-// NewTensorCommitment returns a new TensorCommitment
+// NewTCParams returns a new TcParams
 // * ρ rate of the code ( > 1)
 // * size size of the polynomial to be committed. The size of the commitment is
 // then ρ * √(m) where m² = size
