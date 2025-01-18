@@ -6,17 +6,11 @@ import (
 
 	"github.com/consensys/gnark-crypto/field/generator"
 	"github.com/consensys/gnark-crypto/field/generator/config"
-	"github.com/consensys/gnark-crypto/internal/generator/git"
 )
 
 //go:generate go run main.go
 func main() {
 	// generate the following fields
-	if !(git.HasChanges("field")) {
-		panic("really?")
-		fmt.Printf("no changes in field, skipping generation\n")
-		return
-	}
 	type field struct {
 		name    string
 		modulus string

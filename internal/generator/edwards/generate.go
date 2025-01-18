@@ -5,13 +5,9 @@ import (
 
 	"github.com/consensys/bavard"
 	"github.com/consensys/gnark-crypto/internal/generator/config"
-	"github.com/consensys/gnark-crypto/internal/generator/git"
 )
 
 func Generate(conf config.TwistedEdwardsCurve, baseDir string, bgen *bavard.BatchGenerator) error {
-	if !(git.HasChanges("./edwards/template")) {
-		return nil
-	}
 	entries := []bavard.Entry{
 		{File: filepath.Join(baseDir, "point.go"), Templates: []string{"point.go.tmpl"}},
 		{File: filepath.Join(baseDir, "point_test.go"), Templates: []string{"tests/point.go.tmpl"}},

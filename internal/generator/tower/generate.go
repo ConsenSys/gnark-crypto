@@ -7,17 +7,13 @@ import (
 
 	"github.com/consensys/bavard"
 	"github.com/consensys/gnark-crypto/internal/generator/config"
-	"github.com/consensys/gnark-crypto/internal/generator/git"
+
 	"github.com/consensys/gnark-crypto/internal/generator/tower/asm/amd64"
 )
 
 // Generate generates a tower 2->6->12 over fp
 func Generate(conf config.Curve, baseDir string, bgen *bavard.BatchGenerator) error {
 	if conf.Equal(config.BW6_761) || conf.Equal(config.BW6_633) || conf.Equal(config.BLS24_315) || conf.Equal(config.BLS24_317) {
-		return nil
-	}
-
-	if !(git.HasChanges("./tower/template")) {
 		return nil
 	}
 

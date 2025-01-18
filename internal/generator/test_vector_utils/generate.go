@@ -5,7 +5,7 @@ import (
 
 	"github.com/consensys/bavard"
 	"github.com/consensys/gnark-crypto/internal/generator/config"
-	"github.com/consensys/gnark-crypto/internal/generator/git"
+
 	"github.com/consensys/gnark-crypto/internal/generator/gkr"
 	"github.com/consensys/gnark-crypto/internal/generator/polynomial"
 	"github.com/consensys/gnark-crypto/internal/generator/sumcheck"
@@ -43,10 +43,6 @@ func GenerateRationals(bgen *bavard.BatchGenerator) error {
 	}
 
 	// generate gkr test vector generator for rationals
-	if !git.HasChanges("./gkr/template/") {
-		return nil
-	}
-
 	gkrConf.OutsideGkrPackage = true
 	return bgen.Generate(gkrConf, "main", "./gkr/template", bavard.Entry{
 		File: filepath.Join("gkr", "test_vectors", "main.go"), Templates: []string{"gkr.test.vectors.gen.go.tmpl", "gkr.test.vectors.go.tmpl"},
@@ -55,9 +51,6 @@ func GenerateRationals(bgen *bavard.BatchGenerator) error {
 }
 
 func Generate(conf Config, baseDir string, bgen *bavard.BatchGenerator) error {
-	if !git.HasChanges("./test_vector_utils/template/") {
-		return nil
-	}
 	entry := bavard.Entry{
 		File: filepath.Join(baseDir, "test_vector_utils.go"), Templates: []string{"test_vector_utils.go.tmpl"},
 	}

@@ -43,7 +43,6 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/consensys/gnark-crypto/internal/generator/git"
 	"github.com/mmcloughlin/addchain"
 	"github.com/mmcloughlin/addchain/acc"
 	"github.com/mmcloughlin/addchain/acc/ast"
@@ -65,10 +64,6 @@ var (
 
 // GetAddChain returns template data of a short addition chain for given big.Int
 func GetAddChain(n *big.Int) *AddChainData {
-	if !git.HasChanges("field") {
-		return nil // a bit risky but well.
-	}
-
 	// init the cache only once.
 	once.Do(initCache)
 

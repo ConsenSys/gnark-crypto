@@ -9,7 +9,7 @@ import (
 	"encoding/json"
 	"fmt"
 	fiatshamir "github.com/consensys/gnark-crypto/fiat-shamir"
-	"github.com/consensys/gnark-crypto/internal/generator/git"
+	
 	"github.com/consensys/gnark-crypto/internal/generator/test_vector_utils/small_rational"
 	"github.com/consensys/gnark-crypto/internal/generator/test_vector_utils/small_rational/gkr"
 	"github.com/consensys/gnark-crypto/internal/generator/test_vector_utils/small_rational/polynomial"
@@ -29,11 +29,6 @@ func main() {
 }
 
 func GenerateVectors() error {
-	if !git.HasChanges("gkr/test_vectors") {
-		fmt.Println("no changes in gkr/test_vectors, skipping generation")
-		return nil
-	}
-
 	testDirPath, err := filepath.Abs("gkr/test_vectors")
 	if err != nil {
 		return err

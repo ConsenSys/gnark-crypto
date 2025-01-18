@@ -7,7 +7,6 @@ import (
 
 	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fr/mimc"
-	"github.com/consensys/gnark-crypto/internal/generator/git"
 )
 
 type numericalMiMCTestCase struct {
@@ -24,10 +23,6 @@ func assertNoError(err error) {
 
 //go:generate go run main.go
 func main() {
-	if !git.HasChanges("mimc/vectors.json") {
-		fmt.Println("no changes in mimc/vectors.json, skipping generation")
-		return
-	}
 	fmt.Println("generating test vectors for MiMC...")
 	var tests []numericalMiMCTestCase
 
