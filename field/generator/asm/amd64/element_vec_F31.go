@@ -499,22 +499,31 @@ func (f *FFAmd64) generateInnerProdVecF31() {
 // 	}
 // }
 
+// TODO @gbotrel review stack size needed for vec functions.
+
 func (f *FFAmd64) generateFFTKernelF31(klog2 int) {
-	ksize := 1 << klog2
-	f.Comment(fmt.Sprintf("kerDIFNP_%d_avx512(a, twiddles [][]{{ .FF }}.Element, stage int)", ksize))
+	nGO := 1 << klog2
+	mGO := nGO >> 1
+	f.Comment(fmt.Sprintf("kerDIFNP_%d_avx512(a []{{ .FF }}.Element, twiddles [][]{{ .FF }}.Element, stage int)", nGO))
 	// f.Comment("kerDIFNP_256_avx512(a, twiddles *Element, m uint64)")
 	// f.Comment("n is the number of blocks of 8 elements to process")
-	const argSize = 3 * 8
+	const argSize = 7 * 8
 	stackSize := f.StackSize(f.NbWords*2+4, 0, 0)
-	registers := f.FnHeader(fmt.Sprintf("kerDIFNP_%d_avx512", ksize), stackSize, argSize)
+	registers := f.FnHeader(fmt.Sprintf("kerDIFNP_%d_avx512", nGO), stackSize, argSize)
 	defer f.AssertCleanStack(stackSize, 0)
 
 	// registers & labels we need
 	addrA := f.Pop(&registers)
 	addrAPlusM := f.Pop(&registers)
+	addrTwiddlesRoot := f.Pop(&registers)
 	addrTwiddles := f.Pop(&registers)
-	len := f.Pop(&registers)
-	m := f.Pop(&registers)
+	innerLen := f.Pop(&registers)
+	M := f.Pop(&registers)
+	outerOffset := f.Pop(&registers)
+	N := f.Pop(&registers)
+	aOffset := f.Pop(&registers)
+	bound := f.Pop(&registers)
+	SPLIT := f.Pop(&registers)
 
 	// AVX512 registers
 	a := amd64.Register("Z0")
@@ -528,6 +537,13 @@ func (f *FFAmd64) generateFFTKernelF31(klog2 int) {
 	b0 := amd64.Register("Z8")
 	b1 := amd64.Register("Z9")
 
+	innerLoop := f.NewLabel("inner_loop")
+	innerDone := f.NewLabel("inner_done")
+	outerLoop := f.NewLabel("outer_loop")
+	outerDone := f.NewLabel("outer_done")
+	restart := f.NewLabel("restart")
+	done := f.NewLabel("done")
+
 	// load q in Z3
 	f.WriteLn("MOVD $const_q, AX")
 	f.VPBROADCASTQ("AX", q)
@@ -538,29 +554,51 @@ func (f *FFAmd64) generateFFTKernelF31(klog2 int) {
 	f.VPCMPEQB("Y0", "Y0", "Y0")
 	f.VPMOVZXDQ("Y0", LSW)
 
-	loop := f.NewLabel("loop")
-	done := f.NewLabel("done")
-
 	// load arguments
+	f.MOVQ("twiddles+24(FP)", addrTwiddlesRoot)
+	f.MOVQ("stage+48(FP)", "AX")
+	f.IMULQ("$24", "AX")
+	f.ADDQ("AX", addrTwiddlesRoot) // we start at twiddles[stage]
+
+	f.MOVQ("$1", SPLIT)
+	f.MOVQ(nGO, bound, "bound = split * n == size kernel for first value")
+	f.MOVQ(nGO, N)
+	f.MOVQ(mGO, M)
+
+	// outer loop
+	f.LABEL(restart)
+	// for offset :=0; offset  < bound; offset += n {
+	f.XORQ(outerOffset, outerOffset) // outerOffset = 0
+
+	f.LABEL(outerLoop)
+	f.CMPQ(outerOffset, bound)
+	f.JGE(outerDone, "end of outer loop")
+
+	// body outer loop start
+
+	// aa := a[offset:offset + n]
+	// t := twiddles[stage + step]
 	f.MOVQ("a+0(FP)", addrA)
-	f.MOVQ("twiddles+8(FP)", addrTwiddles)
-	f.MOVQ("m+16(FP)", m)
+	f.MOVQ(outerOffset, aOffset)
+	f.SHLQ("$2", aOffset, "aOffset = offset * 4bytes")
+	f.ADDQ(aOffset, addrA, "addrA = a + offset")
 
-	f.MOVQ(m, len)
-
-	// divide len by 8 (nb of iterations of 8 elements)
-	f.SHRQ("$3", len)
-
-	// multiply m by 4 (number of bytes in one element)
-	f.SHLQ("$2", m)
-
+	// f.MOVQ(outerOffset, aOffset)
 	f.MOVQ(addrA, addrAPlusM)
-	f.ADDQ(m, addrAPlusM)
+	f.MOVQ(M, aOffset)
+	f.SHLQ("$2", aOffset, "aOffset = m * 4bytes")
+	f.ADDQ(aOffset, addrAPlusM, "addrAPlusM = a + offset + m")
 
-	f.LABEL(loop)
+	f.MOVQ(addrTwiddlesRoot.At(0), addrTwiddles) // twiddles[0]
 
-	f.TESTQ(len, len)
-	f.JEQ(done, "n == 0, we are done")
+	f.MOVQ(M, innerLen)
+	// divide len by 8 (nb of iterations of 8 elements)
+	f.SHRQ("$3", innerLen)
+
+	f.LABEL(innerLoop)
+
+	f.TESTQ(innerLen, innerLen)
+	f.JEQ(innerDone, "n == 0, we are done")
 
 	// a[i] = a[i] + a[i+m]
 	// a[m] = (a[i] - a[i+m])
@@ -606,13 +644,38 @@ func (f *FFAmd64) generateFFTKernelF31(klog2 int) {
 	f.ADDQ("$32", addrA)
 	f.ADDQ("$32", addrTwiddles)
 	f.ADDQ("$32", addrAPlusM)
-	f.DECQ(len, "decrement n")
-	f.JMP(loop)
+	f.DECQ(innerLen, "decrement n")
+	f.JMP(innerLoop)
+
+	f.LABEL(innerDone)
+
+	// body outer loop end
+
+	f.ADDQ(N, outerOffset)
+	f.JMP(outerLoop)
+
+	f.LABEL(outerDone)
+	// end step 0
+	f.SHRQ("$1", N)
+	f.MOVQ(N, M)
+	f.SHRQ("$1", M)
+
+	// if M < 8, we go to done
+	f.CMPQ(M, "$8")
+	f.JL(done, "M < 8, we are done")
+
+	f.SHLQ("$1", SPLIT)
+	f.MOVQ(SPLIT, bound)
+	f.IMULQ(N, bound)
+
+	// advance twiddles
+	f.ADDQ("$24", addrTwiddlesRoot)
+
+	f.JMP(restart)
 
 	f.LABEL(done)
-
 	f.RET()
 
-	f.Push(&registers, addrA, addrTwiddles, addrAPlusM, len)
+	f.Push(&registers, addrA, addrTwiddles, addrAPlusM, innerLen)
 
 }

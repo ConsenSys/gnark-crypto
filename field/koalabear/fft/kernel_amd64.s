@@ -3,8 +3,8 @@
 #include "funcdata.h"
 #include "go_asm.h"
 
-// kerDIFNP_32_avx512(a, twiddles [][]{{ .FF }}.Element, stage int)
-TEXT ·kerDIFNP_32_avx512(SB), NOSPLIT, $0-24
+// kerDIFNP_32_avx512(a []{{ .FF }}.Element, twiddles [][]{{ .FF }}.Element, stage int)
+TEXT ·kerDIFNP_32_avx512(SB), NOSPLIT, $0-56
 	MOVD         $const_q, AX
 	VPBROADCASTQ AX, Z4
 	MOVD         $const_qInvNeg, AX
@@ -13,50 +13,84 @@ TEXT ·kerDIFNP_32_avx512(SB), NOSPLIT, $0-24
 	// Create mask for low dword in each qword
 	VPCMPEQB  Y0, Y0, Y0
 	VPMOVZXDQ Y0, Z7
-	MOVQ      a+0(FP), AX
-	MOVQ      twiddles+8(FP), CX
-	MOVQ      m+16(FP), SI
-	MOVQ      SI, BX
-	SHRQ      $3, BX
-	SHLQ      $2, SI
-	MOVQ      AX, DX
-	ADDQ      SI, DX
+	MOVQ      twiddles+24(FP), CX
+	MOVQ      stage+48(FP), AX
+	IMULQ     $24, AX
+	ADDQ      AX, CX
+	MOVQ      $1, R12
+	MOVQ      $0x0000000000000020, R11 // bound = split * n == size kernel for first value
+	MOVQ      $0x0000000000000020, R9
+	MOVQ      $0x0000000000000010, DI
 
-loop_1:
-	TESTQ     BX, BX
-	JEQ       done_2      // n == 0, we are done
+restart_5:
+	XORQ R8, R8
+
+outer_loop_3:
+	CMPQ R8, R11
+	JGE  outer_done_4 // end of outer loop
+	MOVQ a+0(FP), AX
+	MOVQ R8, R10
+	SHLQ $2, R10      // aOffset = offset * 4bytes
+	ADDQ R10, AX      // addrA = a + offset
+	MOVQ AX, DX
+	MOVQ DI, R10
+	SHLQ $2, R10      // aOffset = m * 4bytes
+	ADDQ R10, DX      // addrAPlusM = a + offset + m
+	MOVQ 0(CX), BX
+	MOVQ DI, SI
+	SHRQ $3, SI
+
+inner_loop_1:
+	TESTQ     SI, SI
+	JEQ       inner_done_2 // n == 0, we are done
 	VPMOVZXDQ 0(AX), Z0
 	VPMOVZXDQ 0(DX), Z1
-	VPADDD    Z0, Z1, Z8  // b0 = a + am
-	VPSUBD    Z1, Z0, Z9  // b1 = a - am
-	VPSUBD    Z4, Z8, Z6  // PL = b0 - q
-	VPMINUD   Z8, Z6, Z8  // b0 = min(b0, PL)
-	VPMOVQD   Z8, 0(AX)   // a = b0
-	VPADDD    Z4, Z9, Z9  // PL = b1 + q
-	VPMOVZXDQ 0(CX), Z2
-	VPMULUDQ  Z9, Z2, Z3  // P = b1 * twiddles
-	VPANDQ    Z7, Z3, Z6  // m = uint32(P)
-	VPMULUDQ  Z6, Z5, Z6  // m = m * qInvNeg
-	VPANDQ    Z7, Z6, Z6  // m = uint32(m)
-	VPMULUDQ  Z6, Z4, Z6  // m = m * q
-	VPADDQ    Z3, Z6, Z3  // P = P + m
-	VPSRLQ    $32, Z3, Z3 // P = P >> 32
-	VPSUBD    Z4, Z3, Z6  // PL = P - q
-	VPMINUD   Z3, Z6, Z3  // P = min(P, PL)
-	VPMOVQD   Z3, 0(DX)   // res = P
+	VPADDD    Z0, Z1, Z8   // b0 = a + am
+	VPSUBD    Z1, Z0, Z9   // b1 = a - am
+	VPSUBD    Z4, Z8, Z6   // PL = b0 - q
+	VPMINUD   Z8, Z6, Z8   // b0 = min(b0, PL)
+	VPMOVQD   Z8, 0(AX)    // a = b0
+	VPADDD    Z4, Z9, Z9   // PL = b1 + q
+	VPMOVZXDQ 0(BX), Z2
+	VPMULUDQ  Z9, Z2, Z3   // P = b1 * twiddles
+	VPANDQ    Z7, Z3, Z6   // m = uint32(P)
+	VPMULUDQ  Z6, Z5, Z6   // m = m * qInvNeg
+	VPANDQ    Z7, Z6, Z6   // m = uint32(m)
+	VPMULUDQ  Z6, Z4, Z6   // m = m * q
+	VPADDQ    Z3, Z6, Z3   // P = P + m
+	VPSRLQ    $32, Z3, Z3  // P = P >> 32
+	VPSUBD    Z4, Z3, Z6   // PL = P - q
+	VPMINUD   Z3, Z6, Z3   // P = min(P, PL)
+	VPMOVQD   Z3, 0(DX)    // res = P
 
 	// increment pointers to visit next element
 	ADDQ $32, AX
-	ADDQ $32, CX
+	ADDQ $32, BX
 	ADDQ $32, DX
-	DECQ BX      // decrement n
-	JMP  loop_1
+	DECQ SI           // decrement n
+	JMP  inner_loop_1
 
-done_2:
+inner_done_2:
+	ADDQ R9, R8
+	JMP  outer_loop_3
+
+outer_done_4:
+	SHRQ  $1, R9
+	MOVQ  R9, DI
+	SHRQ  $1, DI
+	CMPQ  DI, $8
+	JL    done_6    // M < 8, we are done
+	SHLQ  $1, R12
+	MOVQ  R12, R11
+	IMULQ R9, R11
+	ADDQ  $24, CX
+	JMP   restart_5
+
+done_6:
 	RET
 
-// kerDIFNP_256_avx512(a, twiddles [][]{{ .FF }}.Element, stage int)
-TEXT ·kerDIFNP_256_avx512(SB), NOSPLIT, $0-24
+// kerDIFNP_256_avx512(a []{{ .FF }}.Element, twiddles [][]{{ .FF }}.Element, stage int)
+TEXT ·kerDIFNP_256_avx512(SB), NOSPLIT, $0-56
 	MOVD         $const_q, AX
 	VPBROADCASTQ AX, Z4
 	MOVD         $const_qInvNeg, AX
@@ -65,44 +99,78 @@ TEXT ·kerDIFNP_256_avx512(SB), NOSPLIT, $0-24
 	// Create mask for low dword in each qword
 	VPCMPEQB  Y0, Y0, Y0
 	VPMOVZXDQ Y0, Z7
-	MOVQ      a+0(FP), AX
-	MOVQ      twiddles+8(FP), CX
-	MOVQ      m+16(FP), SI
-	MOVQ      SI, BX
-	SHRQ      $3, BX
-	SHLQ      $2, SI
-	MOVQ      AX, DX
-	ADDQ      SI, DX
+	MOVQ      twiddles+24(FP), CX
+	MOVQ      stage+48(FP), AX
+	IMULQ     $24, AX
+	ADDQ      AX, CX
+	MOVQ      $1, R12
+	MOVQ      $0x0000000000000100, R11 // bound = split * n == size kernel for first value
+	MOVQ      $0x0000000000000100, R9
+	MOVQ      $0x0000000000000080, DI
 
-loop_3:
-	TESTQ     BX, BX
-	JEQ       done_4      // n == 0, we are done
+restart_11:
+	XORQ R8, R8
+
+outer_loop_9:
+	CMPQ R8, R11
+	JGE  outer_done_10 // end of outer loop
+	MOVQ a+0(FP), AX
+	MOVQ R8, R10
+	SHLQ $2, R10       // aOffset = offset * 4bytes
+	ADDQ R10, AX       // addrA = a + offset
+	MOVQ AX, DX
+	MOVQ DI, R10
+	SHLQ $2, R10       // aOffset = m * 4bytes
+	ADDQ R10, DX       // addrAPlusM = a + offset + m
+	MOVQ 0(CX), BX
+	MOVQ DI, SI
+	SHRQ $3, SI
+
+inner_loop_7:
+	TESTQ     SI, SI
+	JEQ       inner_done_8 // n == 0, we are done
 	VPMOVZXDQ 0(AX), Z0
 	VPMOVZXDQ 0(DX), Z1
-	VPADDD    Z0, Z1, Z8  // b0 = a + am
-	VPSUBD    Z1, Z0, Z9  // b1 = a - am
-	VPSUBD    Z4, Z8, Z6  // PL = b0 - q
-	VPMINUD   Z8, Z6, Z8  // b0 = min(b0, PL)
-	VPMOVQD   Z8, 0(AX)   // a = b0
-	VPADDD    Z4, Z9, Z9  // PL = b1 + q
-	VPMOVZXDQ 0(CX), Z2
-	VPMULUDQ  Z9, Z2, Z3  // P = b1 * twiddles
-	VPANDQ    Z7, Z3, Z6  // m = uint32(P)
-	VPMULUDQ  Z6, Z5, Z6  // m = m * qInvNeg
-	VPANDQ    Z7, Z6, Z6  // m = uint32(m)
-	VPMULUDQ  Z6, Z4, Z6  // m = m * q
-	VPADDQ    Z3, Z6, Z3  // P = P + m
-	VPSRLQ    $32, Z3, Z3 // P = P >> 32
-	VPSUBD    Z4, Z3, Z6  // PL = P - q
-	VPMINUD   Z3, Z6, Z3  // P = min(P, PL)
-	VPMOVQD   Z3, 0(DX)   // res = P
+	VPADDD    Z0, Z1, Z8   // b0 = a + am
+	VPSUBD    Z1, Z0, Z9   // b1 = a - am
+	VPSUBD    Z4, Z8, Z6   // PL = b0 - q
+	VPMINUD   Z8, Z6, Z8   // b0 = min(b0, PL)
+	VPMOVQD   Z8, 0(AX)    // a = b0
+	VPADDD    Z4, Z9, Z9   // PL = b1 + q
+	VPMOVZXDQ 0(BX), Z2
+	VPMULUDQ  Z9, Z2, Z3   // P = b1 * twiddles
+	VPANDQ    Z7, Z3, Z6   // m = uint32(P)
+	VPMULUDQ  Z6, Z5, Z6   // m = m * qInvNeg
+	VPANDQ    Z7, Z6, Z6   // m = uint32(m)
+	VPMULUDQ  Z6, Z4, Z6   // m = m * q
+	VPADDQ    Z3, Z6, Z3   // P = P + m
+	VPSRLQ    $32, Z3, Z3  // P = P >> 32
+	VPSUBD    Z4, Z3, Z6   // PL = P - q
+	VPMINUD   Z3, Z6, Z3   // P = min(P, PL)
+	VPMOVQD   Z3, 0(DX)    // res = P
 
 	// increment pointers to visit next element
 	ADDQ $32, AX
-	ADDQ $32, CX
+	ADDQ $32, BX
 	ADDQ $32, DX
-	DECQ BX      // decrement n
-	JMP  loop_3
+	DECQ SI           // decrement n
+	JMP  inner_loop_7
 
-done_4:
+inner_done_8:
+	ADDQ R9, R8
+	JMP  outer_loop_9
+
+outer_done_10:
+	SHRQ  $1, R9
+	MOVQ  R9, DI
+	SHRQ  $1, DI
+	CMPQ  DI, $8
+	JL    done_12    // M < 8, we are done
+	SHLQ  $1, R12
+	MOVQ  R12, R11
+	IMULQ R9, R11
+	ADDQ  $24, CX
+	JMP   restart_11
+
+done_12:
 	RET
