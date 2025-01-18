@@ -468,3 +468,119 @@ func (f *FFAmd64) generateInnerProdVecF31() {
 
 	f.Push(&registers, addrA, addrT, len)
 }
+
+func (f *FFAmd64) generateButterflyMulVecF31() {
+	f.Comment("butterflyMulVec(a, twiddles *Element, m uint64)")
+	f.Comment("n is the number of blocks of 8 elements to process")
+	const argSize = 3 * 8
+	stackSize := f.StackSize(f.NbWords*2+4, 0, 0)
+	registers := f.FnHeader("butterflyMulVec", stackSize, argSize)
+	defer f.AssertCleanStack(stackSize, 0)
+
+	// registers & labels we need
+	addrA := f.Pop(&registers)
+	addrAPlusM := f.Pop(&registers)
+	addrTwiddles := f.Pop(&registers)
+	len := f.Pop(&registers)
+	m := f.Pop(&registers)
+
+	// AVX512 registers
+	a := amd64.Register("Z0")
+	am := amd64.Register("Z1")
+	twiddles := amd64.Register("Z2")
+	P := amd64.Register("Z3")
+	q := amd64.Register("Z4")
+	qInvNeg := amd64.Register("Z5")
+	PL := amd64.Register("Z6")
+	LSW := amd64.Register("Z7")
+	b0 := amd64.Register("Z8")
+	b1 := amd64.Register("Z9")
+
+	// load q in Z3
+	f.WriteLn("MOVD $const_q, AX")
+	f.VPBROADCASTQ("AX", q)
+	f.WriteLn("MOVD $const_qInvNeg, AX")
+	f.VPBROADCASTQ("AX", qInvNeg)
+
+	f.Comment("Create mask for low dword in each qword")
+	f.VPCMPEQB("Y0", "Y0", "Y0")
+	f.VPMOVZXDQ("Y0", LSW)
+
+	loop := f.NewLabel("loop")
+	done := f.NewLabel("done")
+
+	// load arguments
+	f.MOVQ("a+0(FP)", addrA)
+	f.MOVQ("twiddles+8(FP)", addrTwiddles)
+	f.MOVQ("m+16(FP)", m)
+
+	f.MOVQ(m, len)
+
+	// divide len by 8 (nb of iterations of 8 elements)
+	f.SHRQ("$3", len)
+
+	// multiply m by 4 (number of bytes in one element)
+	f.SHLQ("$2", m)
+
+	f.MOVQ(addrA, addrAPlusM)
+	f.ADDQ(m, addrAPlusM)
+
+	f.LABEL(loop)
+
+	f.TESTQ(len, len)
+	f.JEQ(done, "n == 0, we are done")
+
+	// a[i] = a[i] + a[i+m]
+	// a[m] = (a[i] - a[i+m])
+	// Butterfly(&a[0], &a[m])
+	f.VPMOVZXDQ(addrA.At(0), a)
+	f.VPMOVZXDQ(addrAPlusM.At(0), am)
+
+	// b0 = a + am
+	f.VPADDD(a, am, b0, "b0 = a + am")
+	// b1 = a - am
+	f.VPSUBD(am, a, b1, "b1 = a - am")
+
+	// reduce b0 mod q
+	f.VPSUBD(q, b0, PL, "PL = b0 - q")
+	f.VPMINUD(b0, PL, b0, "b0 = min(b0, PL)")
+
+	// store it
+	f.VPMOVQD(b0, addrA.At(0), "a = b0")
+
+	// reduce b1 mod q
+	f.VPADDD(q, b1, b1, "PL = b1 + q")
+	// f.VPMINUD(b1, PL, b1, "b1 = min(b1, PL)")
+
+	// now we just mul b1 by twiddles
+	// a[i+m].Mul(&a[i+m], &twiddles[i])
+	f.VPMOVZXDQ(addrTwiddles.At(0), twiddles)
+
+	f.VPMULUDQ(b1, twiddles, P, "P = b1 * twiddles")
+	f.VPANDQ(LSW, P, PL, "m = uint32(P)")
+	f.VPMULUDQ(PL, qInvNeg, PL, "m = m * qInvNeg")
+	f.VPANDQ(LSW, PL, PL, "m = uint32(m)")
+	f.VPMULUDQ(PL, q, PL, "m = m * q")
+	f.VPADDQ(P, PL, P, "P = P + m")
+	f.VPSRLQ("$32", P, P, "P = P >> 32")
+
+	f.VPSUBD(q, P, PL, "PL = P - q")
+	f.VPMINUD(P, PL, P, "P = min(P, PL)")
+
+	// move P to res
+	f.VPMOVQD(P, addrAPlusM.At(0), "res = P")
+
+	f.Comment("increment pointers to visit next element")
+	f.ADDQ("$32", addrA)
+	f.ADDQ("$32", addrTwiddles)
+	f.ADDQ("$32", addrAPlusM)
+	f.DECQ(len, "decrement n")
+	f.JMP(loop)
+
+	f.LABEL(done)
+
+	f.RET()
+
+	f.Push(&registers, addrA, addrTwiddles, addrAPlusM, len)
+
+}

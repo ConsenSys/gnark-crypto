@@ -242,6 +242,13 @@ func mulVecGeneric(res, a, b Vector) {
 	}
 }
 
+func butterflyMulVecGeneric(a, twiddles Vector, start, end, m int) {
+	for i := start; i < end; i++ {
+		Butterfly(&a[i], &a[i+m])
+		a[i+m].Mul(&a[i+m], &twiddles[i])
+	}
+}
+
 // TODO @gbotrel make a public package out of that.
 // execute executes the work function in parallel.
 // this is copy paste from internal/parallel/parallel.go

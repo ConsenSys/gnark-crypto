@@ -25,6 +25,9 @@ func scalarMulVec(res, a, b *Element, n uint64)
 //go:noescape
 func innerProdVec(t *uint64, a, b *Element, n uint64)
 
+//go:noescape
+func butterflyMulVec(a, twiddles *Element, m int)
+
 // Add adds two vectors element-wise and stores the result in self.
 // It panics if the vectors don't have the same length.
 func (vector *Vector) Add(a, b Vector) {
@@ -187,4 +190,16 @@ func (vector *Vector) Mul(a, b Vector) {
 		start := n - n%blockSize
 		mulVecGeneric((*vector)[start:], a[start:], b[start:])
 	}
+}
+
+// ButterflyMul used in FFT; TODO complete.
+func (vector *Vector) ButterflyMul(twiddles Vector, start, end, m int) {
+	n := end - start
+	if !supportAvx512 || start != 0 || m%8 != 0 || n != m {
+		// call butterflyMulVec
+		butterflyMulVecGeneric(*vector, twiddles, start, end, m)
+		return
+	}
+
+	butterflyMulVec(&(*vector)[0], &twiddles[0], m)
 }

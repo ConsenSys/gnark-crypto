@@ -262,17 +262,19 @@ func difFFT(a []{{ .FF }}.Element, w {{ .FF }}.Element, twiddles [][]{{ .FF }}.E
 }
 
 func innerDIFWithTwiddles(a []{{ .FF }}.Element, twiddles []{{ .FF }}.Element, start, end, m int) {
-	if start == 0 {
-		{{ .FF }}.Butterfly(&a[0], &a[m])
-		start++
-	}
-	for i := start; i < end; i++ {
-		{{ .FF }}.Butterfly(&a[i], &a[i+m])
-	}
-	// TODO @gbotrel: here the butterfly for most cases could leave the result not reduced mod q
-	v1 := {{ .FF }}.Vector(a[start+m:end+m])
-	v2 := {{ .FF }}.Vector(twiddles[start:end])
-	v1.Mul(v1, v2)
+	va := {{.FF}}.Vector(a)
+	va.ButterflyMul(twiddles, start, end, m)
+	// if start == 0 {
+	// 	{{ .FF }}.Butterfly(&a[0], &a[m])
+	// 	start++
+	// }
+	// for i := start; i < end; i++ {
+	// 	{{ .FF }}.Butterfly(&a[i], &a[i+m])
+	// }
+	// // TODO @gbotrel: here the butterfly for most cases could leave the result not reduced mod q
+	// v1 := {{ .FF }}.Vector(a[start+m:end+m])
+	// v2 := {{ .FF }}.Vector(twiddles[start:end])
+	// v1.Mul(v1, v2)
 }
 
 func innerDIFWithoutTwiddles(a []{{ .FF }}.Element, at, w {{ .FF }}.Element, start, end, m int) {
@@ -399,6 +401,18 @@ func kerDIFNP_{{.sizeKernel}}(a []{{ .FF }}.Element, twiddles [][]{{ .FF }}.Elem
 			for offset := 0; offset < {{$bound}}; offset += {{$n}} {
 				{{- if eq $m 1}}
 					{{ $.FF }}.Butterfly(&a[offset], &a[offset+1])
+				{{- else if eq $m 2}}
+					{{ $.FF }}.Butterfly(&a[offset], &a[offset+2])
+					{{ $.FF }}.Butterfly(&a[offset+1], &a[offset+3])
+					a[offset+3].Mul(&a[offset+3], &twiddles[stage + {{$step}}][1])
+				{{- else if eq $m 4}}
+					{{ $.FF }}.Butterfly(&a[offset], &a[offset+4])
+					{{ $.FF }}.Butterfly(&a[offset+1], &a[offset+5])
+					a[offset+5].Mul(&a[offset+5], &twiddles[stage + {{$step}}][1])
+					{{ $.FF }}.Butterfly(&a[offset+2], &a[offset+6])
+					a[offset+6].Mul(&a[offset+6], &twiddles[stage + {{$step}}][2])
+					{{ $.FF }}.Butterfly(&a[offset+3], &a[offset+7])
+					a[offset+7].Mul(&a[offset+7], &twiddles[stage + {{$step}}][3])
 				{{- else}}
 					innerDIFWithTwiddles(a[offset:offset + {{$n}}], twiddles[stage + {{$step}}], 0, {{$m}}, {{$m}})
 				{{- end}}

@@ -259,17 +259,19 @@ func difFFT(a []goldilocks.Element, w goldilocks.Element, twiddles [][]goldilock
 }
 
 func innerDIFWithTwiddles(a []goldilocks.Element, twiddles []goldilocks.Element, start, end, m int) {
-	if start == 0 {
-		goldilocks.Butterfly(&a[0], &a[m])
-		start++
-	}
-	for i := start; i < end; i++ {
-		goldilocks.Butterfly(&a[i], &a[i+m])
-	}
-	// TODO @gbotrel: here the butterfly for most cases could leave the result not reduced mod q
-	v1 := goldilocks.Vector(a[start+m : end+m])
-	v2 := goldilocks.Vector(twiddles[start:end])
-	v1.Mul(v1, v2)
+	va := goldilocks.Vector(a)
+	va.ButterflyMul(twiddles, start, end, m)
+	// if start == 0 {
+	// 	goldilocks.Butterfly(&a[0], &a[m])
+	// 	start++
+	// }
+	// for i := start; i < end; i++ {
+	// 	goldilocks.Butterfly(&a[i], &a[i+m])
+	// }
+	// // TODO @gbotrel: here the butterfly for most cases could leave the result not reduced mod q
+	// v1 := goldilocks.Vector(a[start+m:end+m])
+	// v2 := goldilocks.Vector(twiddles[start:end])
+	// v1.Mul(v1, v2)
 }
 
 func innerDIFWithoutTwiddles(a []goldilocks.Element, at, w goldilocks.Element, start, end, m int) {
@@ -391,10 +393,18 @@ func kerDIFNP_256(a []goldilocks.Element, twiddles [][]goldilocks.Element, stage
 		innerDIFWithTwiddles(a[offset:offset+16], twiddles[stage+4], 0, 8, 8)
 	}
 	for offset := 0; offset < 256; offset += 8 {
-		innerDIFWithTwiddles(a[offset:offset+8], twiddles[stage+5], 0, 4, 4)
+		goldilocks.Butterfly(&a[offset], &a[offset+4])
+		goldilocks.Butterfly(&a[offset+1], &a[offset+5])
+		a[offset+5].Mul(&a[offset+5], &twiddles[stage+5][1])
+		goldilocks.Butterfly(&a[offset+2], &a[offset+6])
+		a[offset+6].Mul(&a[offset+6], &twiddles[stage+5][2])
+		goldilocks.Butterfly(&a[offset+3], &a[offset+7])
+		a[offset+7].Mul(&a[offset+7], &twiddles[stage+5][3])
 	}
 	for offset := 0; offset < 256; offset += 4 {
-		innerDIFWithTwiddles(a[offset:offset+4], twiddles[stage+6], 0, 2, 2)
+		goldilocks.Butterfly(&a[offset], &a[offset+2])
+		goldilocks.Butterfly(&a[offset+1], &a[offset+3])
+		a[offset+3].Mul(&a[offset+3], &twiddles[stage+6][1])
 	}
 	for offset := 0; offset < 256; offset += 2 {
 		goldilocks.Butterfly(&a[offset], &a[offset+1])
@@ -439,10 +449,18 @@ func kerDIFNP_64(a []goldilocks.Element, twiddles [][]goldilocks.Element, stage 
 		innerDIFWithTwiddles(a[offset:offset+16], twiddles[stage+2], 0, 8, 8)
 	}
 	for offset := 0; offset < 64; offset += 8 {
-		innerDIFWithTwiddles(a[offset:offset+8], twiddles[stage+3], 0, 4, 4)
+		goldilocks.Butterfly(&a[offset], &a[offset+4])
+		goldilocks.Butterfly(&a[offset+1], &a[offset+5])
+		a[offset+5].Mul(&a[offset+5], &twiddles[stage+3][1])
+		goldilocks.Butterfly(&a[offset+2], &a[offset+6])
+		a[offset+6].Mul(&a[offset+6], &twiddles[stage+3][2])
+		goldilocks.Butterfly(&a[offset+3], &a[offset+7])
+		a[offset+7].Mul(&a[offset+7], &twiddles[stage+3][3])
 	}
 	for offset := 0; offset < 64; offset += 4 {
-		innerDIFWithTwiddles(a[offset:offset+4], twiddles[stage+4], 0, 2, 2)
+		goldilocks.Butterfly(&a[offset], &a[offset+2])
+		goldilocks.Butterfly(&a[offset+1], &a[offset+3])
+		a[offset+3].Mul(&a[offset+3], &twiddles[stage+4][1])
 	}
 	for offset := 0; offset < 64; offset += 2 {
 		goldilocks.Butterfly(&a[offset], &a[offset+1])

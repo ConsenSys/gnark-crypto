@@ -259,17 +259,19 @@ func difFFT(a []koalabear.Element, w koalabear.Element, twiddles [][]koalabear.E
 }
 
 func innerDIFWithTwiddles(a []koalabear.Element, twiddles []koalabear.Element, start, end, m int) {
-	if start == 0 {
-		koalabear.Butterfly(&a[0], &a[m])
-		start++
-	}
-	for i := start; i < end; i++ {
-		koalabear.Butterfly(&a[i], &a[i+m])
-	}
-	// TODO @gbotrel: here the butterfly for most cases could leave the result not reduced mod q
-	v1 := koalabear.Vector(a[start+m : end+m])
-	v2 := koalabear.Vector(twiddles[start:end])
-	v1.Mul(v1, v2)
+	va := koalabear.Vector(a)
+	va.ButterflyMul(twiddles, start, end, m)
+	// if start == 0 {
+	// 	koalabear.Butterfly(&a[0], &a[m])
+	// 	start++
+	// }
+	// for i := start; i < end; i++ {
+	// 	koalabear.Butterfly(&a[i], &a[i+m])
+	// }
+	// // TODO @gbotrel: here the butterfly for most cases could leave the result not reduced mod q
+	// v1 := koalabear.Vector(a[start+m:end+m])
+	// v2 := koalabear.Vector(twiddles[start:end])
+	// v1.Mul(v1, v2)
 }
 
 func innerDIFWithoutTwiddles(a []koalabear.Element, at, w koalabear.Element, start, end, m int) {
@@ -391,10 +393,18 @@ func kerDIFNP_256(a []koalabear.Element, twiddles [][]koalabear.Element, stage i
 		innerDIFWithTwiddles(a[offset:offset+16], twiddles[stage+4], 0, 8, 8)
 	}
 	for offset := 0; offset < 256; offset += 8 {
-		innerDIFWithTwiddles(a[offset:offset+8], twiddles[stage+5], 0, 4, 4)
+		koalabear.Butterfly(&a[offset], &a[offset+4])
+		koalabear.Butterfly(&a[offset+1], &a[offset+5])
+		a[offset+5].Mul(&a[offset+5], &twiddles[stage+5][1])
+		koalabear.Butterfly(&a[offset+2], &a[offset+6])
+		a[offset+6].Mul(&a[offset+6], &twiddles[stage+5][2])
+		koalabear.Butterfly(&a[offset+3], &a[offset+7])
+		a[offset+7].Mul(&a[offset+7], &twiddles[stage+5][3])
 	}
 	for offset := 0; offset < 256; offset += 4 {
-		innerDIFWithTwiddles(a[offset:offset+4], twiddles[stage+6], 0, 2, 2)
+		koalabear.Butterfly(&a[offset], &a[offset+2])
+		koalabear.Butterfly(&a[offset+1], &a[offset+3])
+		a[offset+3].Mul(&a[offset+3], &twiddles[stage+6][1])
 	}
 	for offset := 0; offset < 256; offset += 2 {
 		koalabear.Butterfly(&a[offset], &a[offset+1])
@@ -439,10 +449,18 @@ func kerDIFNP_64(a []koalabear.Element, twiddles [][]koalabear.Element, stage in
 		innerDIFWithTwiddles(a[offset:offset+16], twiddles[stage+2], 0, 8, 8)
 	}
 	for offset := 0; offset < 64; offset += 8 {
-		innerDIFWithTwiddles(a[offset:offset+8], twiddles[stage+3], 0, 4, 4)
+		koalabear.Butterfly(&a[offset], &a[offset+4])
+		koalabear.Butterfly(&a[offset+1], &a[offset+5])
+		a[offset+5].Mul(&a[offset+5], &twiddles[stage+3][1])
+		koalabear.Butterfly(&a[offset+2], &a[offset+6])
+		a[offset+6].Mul(&a[offset+6], &twiddles[stage+3][2])
+		koalabear.Butterfly(&a[offset+3], &a[offset+7])
+		a[offset+7].Mul(&a[offset+7], &twiddles[stage+3][3])
 	}
 	for offset := 0; offset < 64; offset += 4 {
-		innerDIFWithTwiddles(a[offset:offset+4], twiddles[stage+4], 0, 2, 2)
+		koalabear.Butterfly(&a[offset], &a[offset+2])
+		koalabear.Butterfly(&a[offset+1], &a[offset+3])
+		a[offset+3].Mul(&a[offset+3], &twiddles[stage+4][1])
 	}
 	for offset := 0; offset < 64; offset += 2 {
 		koalabear.Butterfly(&a[offset], &a[offset+1])

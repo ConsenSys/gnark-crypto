@@ -102,3 +102,8 @@ func (vector *Vector) InnerProduct(other Vector) (res Element) {
 func (vector *Vector) Mul(a, b Vector) {
 	mulVecGeneric(*vector, a, b)
 }
+
+// ButterflyMul used in FFT; TODO complete.
+func (vector *Vector) ButterflyMul(twiddles Vector, start, end, m int) {
+	butterflyMulVecGeneric(*vector, twiddles, start, end, m)
+}

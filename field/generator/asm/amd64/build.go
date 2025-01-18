@@ -271,6 +271,7 @@ func GenerateF31ASM(f *FFAmd64, hasVector bool) error {
 	f.generateMulVecF31()
 	f.generateScalarMulVecF31()
 	f.generateInnerProdVecF31()
+	f.generateButterflyMulVecF31()
 
 	return nil
 }

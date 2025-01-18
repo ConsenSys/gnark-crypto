@@ -142,6 +142,12 @@ var (
 //go:noescape
 func mulVec(res, a, b *{{.ElementName}}, n uint64, qInvNeg uint64)
 
+
+// ButterflyMul used in FFT; TODO complete.
+func (vector *Vector) ButterflyMul(twiddles Vector, start, end, m int) {
+	butterflyMulVecGeneric(*vector, twiddles, start, end, m)
+}
+
 `
 
 const VectorOpsArm64 = VectorOpsPureGo
@@ -243,6 +249,11 @@ func (vector *Vector) InnerProduct(other Vector) (res {{.ElementName}}) {
 func (vector *Vector) Mul(a, b Vector) {
 	mulVecGeneric(*vector, a, b)
 }
+
+// ButterflyMul used in FFT; TODO complete.
+func (vector *Vector) ButterflyMul(twiddles Vector, start, end, m int) {
+	butterflyMulVecGeneric(*vector, twiddles, start, end, m)
+}
 `
 
 const VectorOpsAmd64F31 = `
@@ -264,6 +275,9 @@ func scalarMulVec(res, a, b *{{.ElementName}}, n uint64)
 
 //go:noescape
 func innerProdVec(t *uint64, a, b *{{.ElementName}}, n uint64)
+
+//go:noescape
+func butterflyMulVec(a, twiddles *{{.ElementName}}, m int)
 
 // Add adds two vectors element-wise and stores the result in self.
 // It panics if the vectors don't have the same length.
@@ -429,6 +443,18 @@ func (vector *Vector) Mul(a, b Vector) {
 	}
 }
 
+
+// ButterflyMul used in FFT; TODO complete.
+func (vector *Vector) ButterflyMul(twiddles Vector, start, end, m int) {
+	n := end - start
+	if !supportAvx512 || start != 0 ||m % 8 != 0 || n !=m{
+		// call butterflyMulVec
+		butterflyMulVecGeneric(*vector, twiddles, start, end, m)
+		return
+	}
+
+	butterflyMulVec(&(*vector)[0], &twiddles[0], m)
+}
 
 
 `

@@ -12,7 +12,8 @@ import (
 //go:generate go run main.go
 func main() {
 	// generate the following fields
-	if !git.HasChanges("field") {
+	if !(git.HasChanges("field")) {
+		panic("really?")
 		fmt.Printf("no changes in field, skipping generation\n")
 		return
 	}

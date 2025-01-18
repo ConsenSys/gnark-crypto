@@ -16,7 +16,6 @@ func HasChanges(dir string) bool {
 	dir = filepath.Clean(dir)
 	once.Do(func() {
 		cmd := exec.Command("git", "status", "--porcelain")
-		cmd.Dir = dir
 		output, _ := cmd.Output()
 		gitStatusDiff = string(output)
 	})

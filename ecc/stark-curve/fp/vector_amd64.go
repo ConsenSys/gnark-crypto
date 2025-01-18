@@ -147,3 +147,8 @@ var (
 
 //go:noescape
 func mulVec(res, a, b *Element, n uint64, qInvNeg uint64)
+
+// ButterflyMul used in FFT; TODO complete.
+func (vector *Vector) ButterflyMul(twiddles Vector, start, end, m int) {
+	butterflyMulVecGeneric(*vector, twiddles, start, end, m)
+}
