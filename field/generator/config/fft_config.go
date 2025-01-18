@@ -12,7 +12,7 @@ type FFT struct {
 
 }
 
-// NewFFTConfig returns a data structure with needed information to generate apis for the FFT
+// NewConfig returns a data structure with needed information to generate apis for the FFT
 func NewConfig(
 	genFullMultiplicativeGroup uint64,
 	generatorMaxTwoAdicSubgroup,
