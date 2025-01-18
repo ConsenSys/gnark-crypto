@@ -2,7 +2,11 @@
 
 [![Twitter URL](https://img.shields.io/twitter/url/https/twitter.com/gnark_team.svg?style=social&label=Follow%20%40gnark_team)](https://twitter.com/gnark_team) [![License](https://img.shields.io/badge/license-Apache%202-blue)](LICENSE)  [![Go Report Card](https://goreportcard.com/badge/github.com/Consensys/gnark-crypto)](https://goreportcard.com/badge/github.com/Consensys/gnark-crypto) [![PkgGoDev](https://pkg.go.dev/badge/mod/github.com/Consensys/gnark-crypto)](https://pkg.go.dev/mod/github.com/Consensys/gnark-crypto) [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.5815453.svg)](https://doi.org/10.5281/zenodo.5815453)
 
-`gnark-crypto` provides efficient cryptographic primitives, in Go:
+## Overview
+
+`gnark-crypto` provides efficient cryptographic primitives, in Go. This library is actively developed and maintained by the team (gnark@consensys.net | [HackMD](https://hackmd.io/@gnark)) behind [`gnark`](https://github.com/Consensys/gnark) - a framework to execute (and verify) algorithms in zero-knowledge.
+
+## Features
 
 * Elliptic curve cryptography & **Pairing** on:
   * [`bn254`] ([audit report](https://github.com/Consensys/gnark/blob/master/audits/2022-10%20-%20Kudelski%20-%20gnark-crypto.pdf))
@@ -21,15 +25,19 @@
 * [`plookup`] - Plookup proofs
 * [`eddsa`] - EdDSA signatures (on the companion [`twistededwards`] curves)
 
-`gnark-crypto` is actively developed and maintained by the team (gnark@consensys.net | [HackMD](https://hackmd.io/@gnark)) behind:
+## Important Links
 
-* [`gnark`: a framework to execute (and verify) algorithms in zero-knowledge](https://github.com/Consensys/gnark)
+* [Contributing Guidelines](CONTRIBUTING.md)
+* [Security Policy](SECURITY.md)
+* [License](LICENSE)
+* [Issue Tracker](https://github.com/Consensys/gnark-crypto/issues)
+* [Documentation](https://pkg.go.dev/mod/github.com/Consensys/gnark-crypto)
 
-## Warning
+## Security Warning
 
 **`gnark-crypto` is not fully audited and is provided as-is, use at your own risk. In particular, `gnark-crypto` makes no security guarantees such as constant time implementation or side-channel attack resistance.**
 
-**To report a security bug, please refer to [`gnark` Security Policy](https://github.com/Consensys/gnark/blob/master/SECURITY.md).**
+For security-related issues, please refer to our [Security Policy](SECURITY.md).
 
 `gnark-crypto` packages are optimized for 64bits architectures (x86 `amd64`) and tested on Unix (Linux / macOS).
 
@@ -102,6 +110,26 @@ We use [SemVer](http://semver.org/) for versioning. For the versions available, 
 ## License
 
 This project is licensed under the Apache 2 License - see the [LICENSE](LICENSE) file for details.
+
+## Contributing
+
+We welcome contributions from the community! Here's how you can help:
+
+1. **Fork & Clone**: Start by forking this repository and cloning it locally
+2. **Set Up Development Environment**: 
+   - Ensure you have Go 1.19+ installed
+   - Run `go generate ./...` to generate required files
+   - Run tests with `go test ./...`
+3. **Make Changes**: 
+   - Create a new branch for your feature/fix
+   - Write tests for new functionality
+   - Ensure all tests pass
+4. **Submit Changes**:
+   - Push your changes to your fork
+   - Open a Pull Request with a clear description
+   - Follow our [Contributing Guidelines](CONTRIBUTING.md)
+
+For more detailed information about contributing, please read our [Contributing Guidelines](CONTRIBUTING.md).
 
 [`field/goff`]: https://pkg.go.dev/github.com/Consensys/gnark-crypto/field/goff
 [`bn254`]: https://pkg.go.dev/github.com/Consensys/gnark-crypto/ecc/bn254
