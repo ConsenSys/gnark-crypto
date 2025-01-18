@@ -15,6 +15,8 @@
 package amd64
 
 import (
+	"fmt"
+
 	"github.com/consensys/bavard/amd64"
 )
 
@@ -498,11 +500,13 @@ func (f *FFAmd64) generateInnerProdVecF31() {
 // }
 
 func (f *FFAmd64) generateFFTKernelF31(klog2 int) {
-	f.Comment("butterflyMulVec(a, twiddles *Element, m uint64)")
-	f.Comment("n is the number of blocks of 8 elements to process")
+	ksize := 1 << klog2
+	f.Comment(fmt.Sprintf("kerDIFNP_%d_avx512(a, twiddles [][]{{ .FF }}.Element, stage int)", ksize))
+	// f.Comment("kerDIFNP_256_avx512(a, twiddles *Element, m uint64)")
+	// f.Comment("n is the number of blocks of 8 elements to process")
 	const argSize = 3 * 8
 	stackSize := f.StackSize(f.NbWords*2+4, 0, 0)
-	registers := f.FnHeader("butterflyMulVec", stackSize, argSize)
+	registers := f.FnHeader(fmt.Sprintf("kerDIFNP_%d_avx512", ksize), stackSize, argSize)
 	defer f.AssertCleanStack(stackSize, 0)
 
 	// registers & labels we need

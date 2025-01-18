@@ -272,7 +272,9 @@ func GenerateF31FFTKernels(w io.Writer, nbBits int, kernels []int) error {
 	f.WriteLn("#include \"go_asm.h\"")
 	f.WriteLn("")
 
-	f.generateFFTKernelF31(kernels[0])
+	for _, ksize := range kernels {
+		f.generateFFTKernelF31(ksize)
+	}
 
 	return nil
 }

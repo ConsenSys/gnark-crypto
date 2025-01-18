@@ -30,6 +30,16 @@ func kerDIFNP_32(a []koalabear.Element, twiddles [][]koalabear.Element, stage in
 		return
 	}
 	kerDIFNP_32_avx512(a, twiddles, stage)
+
+	for offset := 0; offset < 32; offset += 8 {
+		innerDIFWithTwiddles(a[offset:offset+8], twiddles[stage+2], 0, 4, 4)
+	}
+	for offset := 0; offset < 32; offset += 4 {
+		innerDIFWithTwiddles(a[offset:offset+4], twiddles[stage+3], 0, 2, 2)
+	}
+	for offset := 0; offset < 32; offset += 2 {
+		koalabear.Butterfly(&a[offset], &a[offset+1])
+	}
 }
 func kerDITNP_32(a []koalabear.Element, twiddles [][]koalabear.Element, stage int) {
 	kerDITNP_32generic(a, twiddles, stage)
@@ -44,6 +54,16 @@ func kerDIFNP_256(a []koalabear.Element, twiddles [][]koalabear.Element, stage i
 		return
 	}
 	kerDIFNP_256_avx512(a, twiddles, stage)
+
+	for offset := 0; offset < 256; offset += 8 {
+		innerDIFWithTwiddles(a[offset:offset+8], twiddles[stage+5], 0, 4, 4)
+	}
+	for offset := 0; offset < 256; offset += 4 {
+		innerDIFWithTwiddles(a[offset:offset+4], twiddles[stage+6], 0, 2, 2)
+	}
+	for offset := 0; offset < 256; offset += 2 {
+		koalabear.Butterfly(&a[offset], &a[offset+1])
+	}
 }
 func kerDITNP_256(a []koalabear.Element, twiddles [][]koalabear.Element, stage int) {
 	kerDITNP_256generic(a, twiddles, stage)

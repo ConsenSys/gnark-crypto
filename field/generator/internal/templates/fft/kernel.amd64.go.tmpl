@@ -25,8 +25,34 @@ func kerDIFNP_{{$ksize}}(a []{{ $.FF }}.Element, twiddles [][]{{ $.FF }}.Element
 		return
 	}
 	kerDIFNP_{{$ksize}}_avx512(a, twiddles, stage)
+	{{ $n := shl 1 $klog2}}
+	{{ $m := div $n 2}}
+	{{ $split := 1}}
+	{{- range $step := iterate 0 $klog2}} 
+
+		{{- if lt $m 8}}
+		{{- $bound := mul $split $n}}
+		{{- if eq $bound $n}}
+			innerDIFWithTwiddles(a[:{{$n}}], twiddles[stage + {{$step}}], 0, {{$m}}, {{$m}})
+		{{- else}}
+			for offset := 0; offset < {{$bound}}; offset += {{$n}} {
+				{{- if eq $m 1}}
+					{{ $.FF }}.Butterfly(&a[offset], &a[offset+1])
+				{{- else}}
+					innerDIFWithTwiddles(a[offset:offset + {{$n}}], twiddles[stage + {{$step}}], 0, {{$m}}, {{$m}})
+				{{- end}}
+			}
+		{{- end}}
+		{{- end}}
+
+
+		{{- $n = div $n 2}}
+		{{- $m = div $n 2}}
+		{{- $split = mul $split 2}}
+	{{- end}}
 }
 func kerDITNP_{{$ksize}}(a []{{ $.FF }}.Element, twiddles [][]{{ $.FF }}.Element, stage int) {
 	kerDITNP_{{$ksize}}generic(a, twiddles, stage)
 }
 {{end}}
+
