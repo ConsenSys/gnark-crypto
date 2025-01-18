@@ -11,10 +11,12 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"math/big"
+	"slices"
+	"sync"
 	"testing"
 
 	"github.com/consensys/gnark-crypto/ecc"
-	"github.com/consensys/gnark-crypto/ecc/bn254"
+	curve "github.com/consensys/gnark-crypto/ecc/bn254"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fr/fft"
 
@@ -22,13 +24,58 @@ import (
 )
 
 // Test SRS re-used across tests of the KZG scheme
-var testSrs *SRS
-var bAlpha *big.Int
+var (
+	testSrs *SRS
+	bAlpha  *big.Int
+)
+
+const srsSize = 230
 
 func init() {
-	const srsSize = 230
 	bAlpha = new(big.Int).SetInt64(42) // randomise ?
 	testSrs, _ = NewSRS(ecc.NextPowerOfTwo(srsSize), bAlpha)
+}
+
+func mpcGenerateSrs(t *testing.T) (srs *SRS, phases [][]byte) {
+	const nbPhases = 1
+	p := InitializeSetup(srsSize)
+
+	phases = make([][]byte, nbPhases)
+
+	var bb bytes.Buffer
+	for i := range phases {
+		p.Contribute()
+		bb.Reset()
+		n, err := p.WriteTo(&bb)
+		require.NoError(t, err)
+		require.Equal(t, n, int64(bb.Len()))
+		phases[i] = slices.Clone(bb.Bytes())
+	}
+
+	res := p.Seal([]byte("test"))
+	return &res, phases
+}
+
+func mpcGetSrs(t *testing.T) *SRS {
+	return sync.OnceValue(func() *SRS {
+		srs, _ := mpcGenerateSrs(t)
+		return srs
+	})()
+}
+
+func TestMpcSetup(t *testing.T) {
+	_, phases := mpcGenerateSrs(t)
+
+	prev := InitializeSetup(srsSize)
+	for i := range phases {
+		var p MpcSetup
+		n, err := p.ReadFrom(bytes.NewReader(phases[i]))
+		require.NoError(t, err)
+		require.Equal(t, int64(len(phases[i])), n)
+
+		require.NoError(t, prev.Verify(&p))
+		prev = p
+	}
 }
 
 func TestToLagrangeG1(t *testing.T) {
@@ -51,11 +98,11 @@ func TestToLagrangeG1(t *testing.T) {
 	n.Exp(alpha, big.NewInt(int64(size))).Sub(&n, &one)
 	d.Sub(&alpha, &one)
 	li.Mul(&li, &n).Div(&li, &d)
-	expectedSrsLagrange := make([]bn254.G1Affine, size)
-	_, _, g1Gen, _ := bn254.Generators()
+	expectedSrsLagrange := make([]curve.G1Affine, size)
+	_, _, g1Gen, _ := curve.Generators()
 	var s big.Int
 	acc.SetOne()
-	for i := 0; i < size; i++ {
+	for i := range size {
 		li.BigInt(&s)
 		expectedSrsLagrange[i].ScalarMultiplication(&g1Gen, &s)
 
@@ -65,15 +112,12 @@ func TestToLagrangeG1(t *testing.T) {
 		li.Div(&li, &d)
 	}
 
-	for i := 0; i < size; i++ {
-		assert.True(expectedSrsLagrange[i].Equal(&lagrange[i]), "error lagrange conversion")
+	for i := range size {
+		assert.True(expectedSrsLagrange[i].Equal(&lagrange[i]), "error lagrange conversion %d", i)
 	}
 }
 
 func TestCommitLagrange(t *testing.T) {
-
-	assert := require.New(t)
-
 	// sample a sparse polynomial (here in Lagrange form)
 	size := 64
 	pol := make([]fr.Element, size)
@@ -82,24 +126,32 @@ func TestCommitLagrange(t *testing.T) {
 		pol[i].SetRandom()
 	}
 
-	// commitment using Lagrange SRS
-	lagrange, err := ToLagrangeG1(testSrs.Pk.G1[:size])
-	assert.NoError(err)
-	var pkLagrange ProvingKey
-	pkLagrange.G1 = lagrange
+	test := func(srs *SRS) func(*testing.T) {
+		return func(t *testing.T) {
+			assert := require.New(t)
 
-	digestLagrange, err := Commit(pol, pkLagrange)
-	assert.NoError(err)
+			// commitment using Lagrange SRS
+			lagrange, err := ToLagrangeG1(srs.Pk.G1[:size])
+			assert.NoError(err)
+			var pkLagrange ProvingKey
+			pkLagrange.G1 = lagrange
 
-	// commitment using canonical SRS
-	d := fft.NewDomain(uint64(size))
-	d.FFTInverse(pol, fft.DIF)
-	fft.BitReverse(pol)
-	digestCanonical, err := Commit(pol, testSrs.Pk)
-	assert.NoError(err)
+			digestLagrange, err := Commit(pol, pkLagrange)
+			assert.NoError(err)
 
-	// compare the results
-	assert.True(digestCanonical.Equal(&digestLagrange), "error CommitLagrange")
+			// commitment using canonical SRS
+			d := fft.NewDomain(uint64(size))
+			d.FFTInverse(pol, fft.DIF)
+			fft.BitReverse(pol)
+			digestCanonical, err := Commit(pol, srs.Pk)
+			assert.NoError(err)
+
+			// compare the results
+			assert.True(digestCanonical.Equal(&digestLagrange), "error CommitLagrange")
+		}
+	}
+	t.Run("unsafe", test(testSrs))
+	t.Run("mpcsetup", test(mpcGetSrs(t)))
 }
 
 func TestDividePolyByXminusA(t *testing.T) {
@@ -167,7 +219,7 @@ func TestCommit(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	var kzgCommit bn254.G1Affine
+	var kzgCommit curve.G1Affine
 	kzgCommit.Unmarshal(_kzgCommit.Marshal())
 
 	// check commitment using manual commit
@@ -176,7 +228,7 @@ func TestCommit(t *testing.T) {
 	fx := eval(f, x)
 	var fxbi big.Int
 	fx.BigInt(&fxbi)
-	var manualCommit bn254.G1Affine
+	var manualCommit curve.G1Affine
 	manualCommit.Set(&testSrs.Vk.G1)
 	manualCommit.ScalarMultiplication(&manualCommit, &fxbi)
 
@@ -184,7 +236,6 @@ func TestCommit(t *testing.T) {
 	if !kzgCommit.Equal(&manualCommit) {
 		t.Fatal("error KZG commitment")
 	}
-
 }
 
 func TestVerifySinglePoint(t *testing.T) {
@@ -192,50 +243,56 @@ func TestVerifySinglePoint(t *testing.T) {
 	// create a polynomial
 	f := randomPolynomial(60)
 
-	// commit the polynomial
-	digest, err := Commit(f, testSrs.Pk)
-	if err != nil {
-		t.Fatal(err)
-	}
+	test := func(srs *SRS) func(*testing.T) {
+		return func(t *testing.T) {
+			// commit the polynomial
+			digest, err := Commit(f, srs.Pk)
+			if err != nil {
+				t.Fatal(err)
+			}
 
-	// compute opening proof at a random point
-	var point fr.Element
-	point.SetString("4321")
-	proof, err := Open(f, point, testSrs.Pk)
-	if err != nil {
-		t.Fatal(err)
-	}
+			// compute opening proof at a random point
+			var point fr.Element
+			point.SetString("4321")
+			proof, err := Open(f, point, srs.Pk)
+			if err != nil {
+				t.Fatal(err)
+			}
 
-	// verify the claimed valued
-	expected := eval(f, point)
-	if !proof.ClaimedValue.Equal(&expected) {
-		t.Fatal("inconsistent claimed value")
-	}
+			// verify the claimed valued
+			expected := eval(f, point)
+			if !proof.ClaimedValue.Equal(&expected) {
+				t.Fatal("inconsistent claimed value")
+			}
 
-	// verify correct proof
-	err = Verify(&digest, &proof, point, testSrs.Vk)
-	if err != nil {
-		t.Fatal(err)
-	}
+			// verify correct proof
+			err = Verify(&digest, &proof, point, srs.Vk)
+			if err != nil {
+				t.Fatal(err)
+			}
 
-	{
-		// verify wrong proof
-		proof.ClaimedValue.Double(&proof.ClaimedValue)
-		err = Verify(&digest, &proof, point, testSrs.Vk)
-		if err == nil {
-			t.Fatal("verifying wrong proof should have failed")
+			{
+				// verify wrong proof
+				proof.ClaimedValue.Double(&proof.ClaimedValue)
+				err = Verify(&digest, &proof, point, srs.Vk)
+				if err == nil {
+					t.Fatal("verifying wrong proof should have failed")
+				}
+			}
+			{
+				// verify wrong proof with quotient set to zero
+				// see https://cryptosubtlety.medium.com/00-8d4adcf4d255
+				proof.H.X.SetZero()
+				proof.H.Y.SetZero()
+				err = Verify(&digest, &proof, point, srs.Vk)
+				if err == nil {
+					t.Fatal("verifying wrong proof should have failed")
+				}
+			}
 		}
 	}
-	{
-		// verify wrong proof with quotient set to zero
-		// see https://cryptosubtlety.medium.com/00-8d4adcf4d255
-		proof.H.X.SetZero()
-		proof.H.Y.SetZero()
-		err = Verify(&digest, &proof, point, testSrs.Vk)
-		if err == nil {
-			t.Fatal("verifying wrong proof should have failed")
-		}
-	}
+	t.Run("unsafe", test(testSrs))
+	t.Run("mpcsetup", test(mpcGetSrs(t)))
 }
 
 func TestVerifySinglePointQuickSRS(t *testing.T) {
@@ -289,69 +346,75 @@ func TestBatchVerifySinglePoint(t *testing.T) {
 		f[i] = randomPolynomial(size)
 	}
 
-	// commit the polynomials
-	digests := make([]Digest, len(f))
-	for i := range f {
-		digests[i], _ = Commit(f[i], testSrs.Pk)
+	test := func(srs *SRS) func(*testing.T) {
+		return func(t *testing.T) {
+			// commit the polynomials
+			digests := make([]Digest, len(f))
+			for i := range f {
+				digests[i], _ = Commit(f[i], srs.Pk)
 
-	}
+			}
 
-	// pick a hash function
-	hf := sha256.New()
+			// pick a hash function
+			hf := sha256.New()
 
-	// compute opening proof at a random point
-	var point fr.Element
-	point.SetString("4321")
-	proof, err := BatchOpenSinglePoint(f, digests, point, hf, testSrs.Pk)
-	if err != nil {
-		t.Fatal(err)
-	}
+			// compute opening proof at a random point
+			var point fr.Element
+			point.SetString("4321")
+			proof, err := BatchOpenSinglePoint(f, digests, point, hf, srs.Pk)
+			if err != nil {
+				t.Fatal(err)
+			}
 
-	var salt fr.Element
-	salt.SetRandom()
-	proofExtendedTranscript, err := BatchOpenSinglePoint(f, digests, point, hf, testSrs.Pk, salt.Marshal())
-	if err != nil {
-		t.Fatal(err)
-	}
+			var salt fr.Element
+			salt.SetRandom()
+			proofExtendedTranscript, err := BatchOpenSinglePoint(f, digests, point, hf, srs.Pk, salt.Marshal())
+			if err != nil {
+				t.Fatal(err)
+			}
 
-	// verify the claimed values
-	for i := range f {
-		expectedClaim := eval(f[i], point)
-		if !expectedClaim.Equal(&proof.ClaimedValues[i]) {
-			t.Fatal("inconsistent claimed values")
+			// verify the claimed values
+			for i := range f {
+				expectedClaim := eval(f[i], point)
+				if !expectedClaim.Equal(&proof.ClaimedValues[i]) {
+					t.Fatal("inconsistent claimed values")
+				}
+			}
+
+			// verify correct proof
+			err = BatchVerifySinglePoint(digests, &proof, point, hf, srs.Vk)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			// verify correct proof with extended transcript
+			err = BatchVerifySinglePoint(digests, &proofExtendedTranscript, point, hf, srs.Vk, salt.Marshal())
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			{
+				// verify wrong proof
+				proof.ClaimedValues[0].Double(&proof.ClaimedValues[0])
+				err = BatchVerifySinglePoint(digests, &proof, point, hf, srs.Vk)
+				if err == nil {
+					t.Fatal("verifying wrong proof should have failed")
+				}
+			}
+			{
+				// verify wrong proof with quotient set to zero
+				// see https://cryptosubtlety.medium.com/00-8d4adcf4d255
+				proof.H.X.SetZero()
+				proof.H.Y.SetZero()
+				err = BatchVerifySinglePoint(digests, &proof, point, hf, srs.Vk)
+				if err == nil {
+					t.Fatal("verifying wrong proof should have failed")
+				}
+			}
 		}
 	}
-
-	// verify correct proof
-	err = BatchVerifySinglePoint(digests, &proof, point, hf, testSrs.Vk)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// verify correct proof with extended transcript
-	err = BatchVerifySinglePoint(digests, &proofExtendedTranscript, point, hf, testSrs.Vk, salt.Marshal())
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	{
-		// verify wrong proof
-		proof.ClaimedValues[0].Double(&proof.ClaimedValues[0])
-		err = BatchVerifySinglePoint(digests, &proof, point, hf, testSrs.Vk)
-		if err == nil {
-			t.Fatal("verifying wrong proof should have failed")
-		}
-	}
-	{
-		// verify wrong proof with quotient set to zero
-		// see https://cryptosubtlety.medium.com/00-8d4adcf4d255
-		proof.H.X.SetZero()
-		proof.H.Y.SetZero()
-		err = BatchVerifySinglePoint(digests, &proof, point, hf, testSrs.Vk)
-		if err == nil {
-			t.Fatal("verifying wrong proof should have failed")
-		}
-	}
+	t.Run("unsafe", test(testSrs))
+	t.Run("mpcsetup", test(mpcGetSrs(t)))
 }
 
 func TestBatchVerifyMultiPoints(t *testing.T) {
@@ -362,66 +425,72 @@ func TestBatchVerifyMultiPoints(t *testing.T) {
 		f[i] = randomPolynomial(40)
 	}
 
-	// commit the polynomials
-	digests := make([]Digest, 10)
-	for i := 0; i < 10; i++ {
-		digests[i], _ = Commit(f[i], testSrs.Pk)
-	}
+	test := func(srs *SRS) func(*testing.T) {
+		return func(t *testing.T) {
+			// commit the polynomials
+			digests := make([]Digest, 10)
+			for i := 0; i < 10; i++ {
+				digests[i], _ = Commit(f[i], srs.Pk)
+			}
 
-	// pick a hash function
-	hf := sha256.New()
+			// pick a hash function
+			hf := sha256.New()
 
-	// compute 2 batch opening proofs at 2 random points
-	points := make([]fr.Element, 2)
-	batchProofs := make([]BatchOpeningProof, 2)
-	points[0].SetRandom()
-	batchProofs[0], _ = BatchOpenSinglePoint(f[:5], digests[:5], points[0], hf, testSrs.Pk)
-	points[1].SetRandom()
-	batchProofs[1], _ = BatchOpenSinglePoint(f[5:], digests[5:], points[1], hf, testSrs.Pk)
+			// compute 2 batch opening proofs at 2 random points
+			points := make([]fr.Element, 2)
+			batchProofs := make([]BatchOpeningProof, 2)
+			points[0].SetRandom()
+			batchProofs[0], _ = BatchOpenSinglePoint(f[:5], digests[:5], points[0], hf, srs.Pk)
+			points[1].SetRandom()
+			batchProofs[1], _ = BatchOpenSinglePoint(f[5:], digests[5:], points[1], hf, srs.Pk)
 
-	// fold the 2 batch opening proofs
-	proofs := make([]OpeningProof, 2)
-	foldedDigests := make([]Digest, 2)
-	proofs[0], foldedDigests[0], _ = FoldProof(digests[:5], &batchProofs[0], points[0], hf)
-	proofs[1], foldedDigests[1], _ = FoldProof(digests[5:], &batchProofs[1], points[1], hf)
+			// fold the 2 batch opening proofs
+			proofs := make([]OpeningProof, 2)
+			foldedDigests := make([]Digest, 2)
+			proofs[0], foldedDigests[0], _ = FoldProof(digests[:5], &batchProofs[0], points[0], hf)
+			proofs[1], foldedDigests[1], _ = FoldProof(digests[5:], &batchProofs[1], points[1], hf)
 
-	// check that the individual batch proofs are correct
-	err := Verify(&foldedDigests[0], &proofs[0], points[0], testSrs.Vk)
-	if err != nil {
-		t.Fatal(err)
-	}
-	err = Verify(&foldedDigests[1], &proofs[1], points[1], testSrs.Vk)
-	if err != nil {
-		t.Fatal(err)
-	}
+			// check that the individual batch proofs are correct
+			err := Verify(&foldedDigests[0], &proofs[0], points[0], srs.Vk)
+			if err != nil {
+				t.Fatal(err)
+			}
+			err = Verify(&foldedDigests[1], &proofs[1], points[1], srs.Vk)
+			if err != nil {
+				t.Fatal(err)
+			}
 
-	// batch verify correct folded proofs
-	err = BatchVerifyMultiPoints(foldedDigests, proofs, points, testSrs.Vk)
-	if err != nil {
-		t.Fatal(err)
-	}
+			// batch verify correct folded proofs
+			err = BatchVerifyMultiPoints(foldedDigests, proofs, points, srs.Vk)
+			if err != nil {
+				t.Fatal(err)
+			}
 
-	{
-		// batch verify tampered folded proofs
-		proofs[0].ClaimedValue.Double(&proofs[0].ClaimedValue)
+			{
+				// batch verify tampered folded proofs
+				proofs[0].ClaimedValue.Double(&proofs[0].ClaimedValue)
 
-		err = BatchVerifyMultiPoints(foldedDigests, proofs, points, testSrs.Vk)
-		if err == nil {
-			t.Fatal(err)
+				err = BatchVerifyMultiPoints(foldedDigests, proofs, points, srs.Vk)
+				if err == nil {
+					t.Fatal(err)
+				}
+			}
+			{
+				// batch verify tampered folded proofs with quotients set to infinity
+				// see https://cryptosubtlety.medium.com/00-8d4adcf4d255
+				proofs[0].H.X.SetZero()
+				proofs[0].H.Y.SetZero()
+				proofs[1].H.X.SetZero()
+				proofs[1].H.Y.SetZero()
+				err = BatchVerifyMultiPoints(foldedDigests, proofs, points, srs.Vk)
+				if err == nil {
+					t.Fatal(err)
+				}
+			}
 		}
 	}
-	{
-		// batch verify tampered folded proofs with quotients set to infinity
-		// see https://cryptosubtlety.medium.com/00-8d4adcf4d255
-		proofs[0].H.X.SetZero()
-		proofs[0].H.Y.SetZero()
-		proofs[1].H.X.SetZero()
-		proofs[1].H.Y.SetZero()
-		err = BatchVerifyMultiPoints(foldedDigests, proofs, points, testSrs.Vk)
-		if err == nil {
-			t.Fatal(err)
-		}
-	}
+	t.Run("unsafe", test(testSrs))
+	t.Run("mpcsetup", test(mpcGetSrs(t)))
 }
 
 func TestUnsafeToBytesTruncating(t *testing.T) {
@@ -622,7 +691,7 @@ func BenchmarkKZGBatchVerify10(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		BatchVerifySinglePoint(commitments[:], &proof, r, hf, testSrs.Vk)
+		BatchVerifySinglePoint(commitments[:], &proof, r, hf, srs.Vk)
 	}
 }
 
@@ -637,7 +706,7 @@ func randomPolynomial(size int) []fr.Element {
 func BenchmarkToLagrangeG1(b *testing.B) {
 	const size = 1 << 14
 
-	var samplePoints [size]bn254.G1Affine
+	var samplePoints [size]curve.G1Affine
 	fillBenchBasesG1(samplePoints[:])
 	b.ResetTimer()
 
@@ -732,7 +801,7 @@ func BenchmarkDeserializeSRS(b *testing.B) {
 	})
 }
 
-func fillBenchBasesG1(samplePoints []bn254.G1Affine) {
+func fillBenchBasesG1(samplePoints []curve.G1Affine) {
 	var r big.Int
 	r.SetString("340444420969191673093399857471996460938405", 10)
 	samplePoints[0].ScalarMultiplication(&samplePoints[0], &r)

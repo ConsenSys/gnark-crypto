@@ -58,7 +58,7 @@ func (c Circuit) maxGateDegree() int {
 	res := 1
 	for i := range c {
 		if !c[i].IsInput() {
-			res = utils.Max(res, c[i].Gate.Degree())
+			res = max(res, c[i].Gate.Degree())
 		}
 	}
 	return res
@@ -521,7 +521,7 @@ func ChallengeNames(sorted []*Wire, logNbInstances int, prefix string) []string 
 		size += logNbInstances // full run of sumcheck on logNbInstances variables
 	}
 
-	nums := make([]string, utils.Max(len(sorted), logNbInstances))
+	nums := make([]string, max(len(sorted), logNbInstances))
 	for i := range nums {
 		nums[i] = strconv.Itoa(i)
 	}
@@ -785,7 +785,7 @@ func (a WireAssignment) Complete(c Circuit) WireAssignment {
 	maxNbIns := 0
 
 	for _, w := range sortedWires {
-		maxNbIns = utils.Max(maxNbIns, len(w.Inputs))
+		maxNbIns = max(maxNbIns, len(w.Inputs))
 		if a[w] == nil {
 			a[w] = make([]small_rational.SmallRational, nbInstances)
 		}

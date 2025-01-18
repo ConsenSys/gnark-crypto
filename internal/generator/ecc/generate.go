@@ -59,8 +59,6 @@ func Generate(conf config.Curve, baseDir string, bgen *bavard.BatchGenerator) er
 	if conf.Name != config.SECP256K1.Name {
 		os.Remove(filepath.Join(baseDir, "g1_lagrange.go"))
 		os.Remove(filepath.Join(baseDir, "g1_lagrange_test.go"))
-		// entries = append(entries, bavard.Entry{File: filepath.Join(baseDir, "g1_lagrange.go"), Templates: []string{"lagrange.go.tmpl"}})
-		// entries = append(entries, bavard.Entry{File: filepath.Join(baseDir, "g1_lagrange_test.go"), Templates: []string{"tests/lagrange.go.tmpl"}})
 	}
 
 	g1 := pconf{conf, conf.G1}
@@ -200,7 +198,11 @@ func Generate(conf config.Curve, baseDir string, bgen *bavard.BatchGenerator) er
 		{File: filepath.Join(baseDir, "g2_test.go"), Templates: []string{"tests/point.go.tmpl"}},
 	}
 	g2 := pconf{conf, conf.G2}
-	return bgen.Generate(g2, packageName, "./ecc/template", entries...)
+	if err := bgen.Generate(g2, packageName, "./ecc/template", entries...); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 type pconf struct {
