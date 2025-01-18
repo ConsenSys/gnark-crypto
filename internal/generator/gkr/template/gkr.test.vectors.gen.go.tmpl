@@ -12,6 +12,8 @@ import (
 	"path/filepath"
 	"reflect"
 	"hash"
+
+    "github.com/consensys/bavard"
 )
 
 func main() {
@@ -22,11 +24,6 @@ func main() {
 }
 
 func GenerateVectors() error {
-    if !git.HasChanges("gkr/test_vectors") {
-        fmt.Println("no changes in gkr/test_vectors, skipping generation")
-        return nil
-    }
-
     testDirPath, err := filepath.Abs("gkr/test_vectors")
     if err != nil {
         return err
@@ -44,6 +41,9 @@ func GenerateVectors() error {
             if filepath.Ext(dirEntry.Name()) == ".json" {
                 fmt.Println("\tprocessing", dirEntry.Name())
                 path := filepath.Join(testDirPath, dirEntry.Name())
+                if !bavard.ShouldGenerate(path) {
+                    continue
+                }
                 if err = run(path); err != nil {
                     return err
                 }
