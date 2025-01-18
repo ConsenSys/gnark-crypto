@@ -1,0 +1,32 @@
+import (
+	"golang.org/x/sys/cpu"
+	"{{ .FieldPackagePath }}"
+)
+
+
+var (
+	supportAVX512 = cpu.X86.HasAVX512 && cpu.X86.HasAVX512DQ
+)
+
+// q + r'.r = 1, i.e., qInvNeg = - q⁻¹ mod r
+// used for Montgomery reduction
+const qInvNeg = {{.QInvNeg}}
+const q = {{.Q}}
+
+{{range $ki, $klog2 := $.Kernels}}
+	{{- $ksize := shl 1 $klog2}}
+
+//go:noescape
+func kerDIFNP_{{$ksize}}_avx512(a []{{ $.FF }}.Element, twiddles [][]{{ $.FF }}.Element, stage int)
+
+func kerDIFNP_{{$ksize}}(a []{{ $.FF }}.Element, twiddles [][]{{ $.FF }}.Element, stage int) {
+	if !supportAVX512 {
+		kerDIFNP_{{$ksize}}generic(a, twiddles, stage)
+		return
+	}
+	kerDIFNP_{{$ksize}}_avx512(a, twiddles, stage)
+}
+func kerDITNP_{{$ksize}}(a []{{ $.FF }}.Element, twiddles [][]{{ $.FF }}.Element, stage int) {
+	kerDITNP_{{$ksize}}generic(a, twiddles, stage)
+}
+{{end}}

@@ -1,0 +1,13 @@
+import (
+	"{{ .FieldPackagePath }}"
+)
+
+{{range $ki, $klog2 := $.Kernels}}
+	{{- $ksize := shl 1 $klog2}}
+func kerDIFNP_{{$ksize}}(a []{{ $.FF }}.Element, twiddles [][]{{ $.FF }}.Element, stage int) {
+	kerDIFNP_{{$ksize}}generic(a, twiddles, stage)
+}
+func kerDITNP_{{$ksize}}(a []{{ $.FF }}.Element, twiddles [][]{{ $.FF }}.Element, stage int) {
+	kerDITNP_{{$ksize}}generic(a, twiddles, stage)
+}
+{{end}}

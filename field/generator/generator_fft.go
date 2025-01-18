@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/consensys/bavard"
+	"github.com/consensys/gnark-crypto/field/generator/asm/amd64"
 	"github.com/consensys/gnark-crypto/field/generator/config"
 	eccconfig "github.com/consensys/gnark-crypto/internal/generator/config"
 )
@@ -33,9 +34,16 @@ func generateFFT(F *config.Field, fft *config.FFT, outputDir string) error {
 		FFT:              *fft,
 		FieldPackagePath: fieldImportPath,
 		FF:               F.PackageName,
+		HasASMKernel:     F.F31,
+		Kernels:          []int{5, 8},
 		Package:          "fft",
 	}
 	outputDir = filepath.Join(outputDir, "fft")
+
+	pureGoBuildTag := ""
+	if data.HasASMKernel {
+		pureGoBuildTag = "purego || (!amd64)"
+	}
 
 	entries := []bavard.Entry{
 		{File: filepath.Join(outputDir, "doc.go"), Templates: []string{"doc.go.tmpl"}},
@@ -44,8 +52,31 @@ func generateFFT(F *config.Field, fft *config.FFT, outputDir string) error {
 		{File: filepath.Join(outputDir, "fft_test.go"), Templates: []string{"tests/fft.go.tmpl"}},
 		{File: filepath.Join(outputDir, "bitreverse_test.go"), Templates: []string{"tests/bitreverse.go.tmpl"}},
 		{File: filepath.Join(outputDir, "fft.go"), Templates: []string{"fft.go.tmpl"}},
+		{File: filepath.Join(outputDir, "kernel_purego.go"), Templates: []string{"kernel.purego.go.tmpl"}, BuildTag: pureGoBuildTag},
 		{File: filepath.Join(outputDir, "bitreverse.go"), Templates: []string{"bitreverse.go.tmpl"}},
 		{File: filepath.Join(outputDir, "options.go"), Templates: []string{"options.go.tmpl"}},
+	}
+
+	if data.HasASMKernel {
+		data.Q = F.Q[0]
+		data.QInvNeg = F.QInverse[0]
+		entries = append(entries,
+			bavard.Entry{
+				File:      filepath.Join(outputDir, "kernel_amd64.go"),
+				Templates: []string{"kernel.amd64.go.tmpl"},
+				BuildTag:  "!purego"})
+
+		// generate the assembly file;
+		fftKernels, err := os.Create(filepath.Join(outputDir, "kernel_amd64.s"))
+		if err != nil {
+			return err
+		}
+
+		if err := amd64.GenerateF31FFTKernels(fftKernels, F.NbBits, data.Kernels); err != nil {
+			fftKernels.Close()
+			return err
+		}
+		fftKernels.Close()
 	}
 
 	funcs := make(map[string]interface{})
@@ -70,7 +101,7 @@ func generateFFT(F *config.Field, fft *config.FFT, outputDir string) error {
 	}
 	fftTemplatesRootDir = filepath.Join(fftTemplatesRootDir, "fft")
 
-	if err := bgen.GenerateWithOptions(data, data.Package, fftTemplatesRootDir, bavardOpts, entries...); err != nil {
+	if err := bgen.GenerateWithOptions(data, "fft", fftTemplatesRootDir, bavardOpts, entries...); err != nil {
 		return err
 	}
 
@@ -91,14 +122,12 @@ func generateFFT(F *config.Field, fft *config.FFT, outputDir string) error {
 type fftTemplateData struct {
 	config.FFT
 
-	// Package name of the generated package
-	Package string
-
-	// ImportPathFiniteField path to the finite field package
-	FieldPackagePath string
-
-	// FF the name of the package corresponding to the finite field
-	FF string
+	FieldPackagePath string // path to the finite field package
+	FF               string // name of the package corresponding to the finite field
+	HasASMKernel     bool   // indicates if the kernels have an assembly impl
+	Kernels          []int  // indicates which kernels to generate
+	Package          string // package name
+	Q, QInvNeg       uint64
 }
 
 func findTemplatesRootDir() (string, error) {

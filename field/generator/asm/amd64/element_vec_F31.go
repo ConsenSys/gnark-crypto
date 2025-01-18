@@ -469,7 +469,35 @@ func (f *FFAmd64) generateInnerProdVecF31() {
 	f.Push(&registers, addrA, addrT, len)
 }
 
-func (f *FFAmd64) generateButterflyMulVecF31() {
+// func kerDIFNP_{{.sizeKernel}}generic(a []{{ .FF }}.Element, twiddles [][]{{ .FF }}.Element, stage int) {
+// 	n := 1 << {{.sizeKernelLog2}}
+// 	m := n >> 1
+// 	split := 1
+
+// 	for step := 0; step < {{.sizeKernelLog2}}; step++ {
+// 		bound := split * n
+// 		if m > 8 {
+// 			for offset :=0; offset  < bound; offset += n {
+// 				innerDIFWithTwiddles(a[offset:offset + n], twiddles[stage + step], 0, m, m)
+// 			}
+// 		} else {
+// 			for offset :=0; offset  < bound; offset += n {
+// 				// innerDIFWithTwiddles(a[offset:offset + n], twiddles[stage + step], 0, m, m)
+// 				aa := a[offset:offset + n]
+// 				t := twiddles[stage + step]
+// 				for i := 0; i < m; i++ {
+// 					{{ .FF }}.Butterfly(&aa[i], &aa[i+m])
+// 					aa[i+m].Mul(&aa[i+m], &t[i])
+// 				}
+// 			}
+// 		}
+// 		n = n >> 1
+// 		m = n >> 1
+// 		split = split << 1
+// 	}
+// }
+
+func (f *FFAmd64) generateFFTKernelF31(klog2 int) {
 	f.Comment("butterflyMulVec(a, twiddles *Element, m uint64)")
 	f.Comment("n is the number of blocks of 8 elements to process")
 	const argSize = 3 * 8
